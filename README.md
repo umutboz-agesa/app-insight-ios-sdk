@@ -59,23 +59,59 @@ struct MyApp: App {
 
 ### 2. Track Screens
 
-Call `screenDidAppear` and `screenDidDisappear` in each view controller or SwiftUI view.
+Three options — from zero-config to fully manual.
 
-**UIKit:**
+---
+
+#### Option A — `AIBaseViewController` (recommended, zero config)
+
+Inherit from `AIBaseViewController`. Screen name is automatically derived from the class name by stripping the `ViewController` / `Controller` suffix.
 
 ```swift
-class HomeViewController: UIViewController {
+// HomeViewController → "Home"
+class HomeViewController: AIBaseViewController { }
+
+// CheckoutViewController → "Checkout"
+class CheckoutViewController: AIBaseViewController { }
+
+// Override to use a custom name:
+class UserProfileViewController: AIBaseViewController {
+    override var aiScreenName: String { "Profile" }
+}
+```
+
+No `viewDidAppear` / `viewDidDisappear` overrides needed.
+
+---
+
+#### Option B — `screenDidAppear(for:)` (without base class)
+
+Use this when you can't change the inheritance chain.
+
+```swift
+class HomeViewController: SomeOtherBaseViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        AppInsight.shared.screenDidAppear("HomeScreen")
+        AppInsight.shared.screenDidAppear(for: self)   // → "Home"
     }
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
-        AppInsight.shared.screenDidDisappear("HomeScreen")
+        AppInsight.shared.screenDidDisappear(for: self)
     }
 }
 ```
+
+---
+
+#### Option C — Manual name (explicit)
+
+```swift
+AppInsight.shared.screenDidAppear("CustomScreenName")
+AppInsight.shared.screenDidDisappear("CustomScreenName")
+```
+
+---
 
 **SwiftUI:**
 
@@ -83,8 +119,7 @@ class HomeViewController: UIViewController {
 struct HomeView: View {
     var body: some View {
         Text("Home")
-            .onAppear  { AppInsight.shared.screenDidAppear("HomeScreen") }
-            .onDisappear { AppInsight.shared.screenDidDisappear("HomeScreen") }
+            .trackScreen("Home")
     }
 }
 ```
