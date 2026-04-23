@@ -63,20 +63,20 @@ Three options — from zero-config to fully manual.
 
 ---
 
-#### Option A — `AIBaseViewController` (recommended, zero config)
+#### Option A — `InsightBaseViewController` (recommended, zero config)
 
-Inherit from `AIBaseViewController`. Screen name is automatically derived from the class name by stripping the `ViewController` / `Controller` suffix.
+Inherit from `InsightBaseViewController`. Screen name is automatically derived from the class name by stripping the `ViewController` / `Controller` suffix.
 
 ```swift
 // HomeViewController → "Home"
-class HomeViewController: AIBaseViewController { }
+class HomeViewController: InsightBaseViewController { }
 
 // CheckoutViewController → "Checkout"
-class CheckoutViewController: AIBaseViewController { }
+class CheckoutViewController: InsightBaseViewController { }
 
 // Override to use a custom name:
-class UserProfileViewController: AIBaseViewController {
-    override var aiScreenName: String { "Profile" }
+class UserProfileViewController: InsightBaseViewController {
+    override var screenName: String { "Profile" }
 }
 ```
 
@@ -86,7 +86,7 @@ No `viewDidAppear` / `viewDidDisappear` overrides needed.
 
 #### Option B — `screenDidAppear(for:)` (without base class)
 
-Use this when you can't change the inheritance chain.
+Use this when you can't change the inheritance chain. The `screenName` property on `UIViewController` derives the name automatically.
 
 ```swift
 class HomeViewController: SomeOtherBaseViewController {
@@ -100,6 +100,9 @@ class HomeViewController: SomeOtherBaseViewController {
         AppInsight.shared.screenDidDisappear(for: self)
     }
 }
+
+// Or access the derived name directly:
+// self.screenName  →  "Home"
 ```
 
 ---
@@ -262,12 +265,26 @@ extension Notification.Name {
 | Method / Property | Description |
 |---|---|
 | `initialize(apiKey:deviceId:environment:)` | Starts SDK and opens WebSocket connection |
-| `screenDidAppear(_ name:)` | Reports screen appearance |
+| `screenDidAppear(_ name:)` | Reports screen appearance with explicit name |
+| `screenDidAppear(for:)` | Reports screen appearance, derives name from controller |
 | `screenDidDisappear(_ name:)` | Reports screen disappearance and duration |
+| `screenDidDisappear(for:)` | Reports screen disappearance, derives name from controller |
 | `disconnect()` | Closes connection and stops tracking |
 | `onInsight` | Callback fired on `insight_push` (main thread) |
 | `onDataPush` | Callback fired on `data_push` (main thread) |
 | `environment` | Currently active environment (read-only after init) |
+
+### `InsightBaseViewController`
+
+| Member | Description |
+|---|---|
+| `var screenName: String` | Auto-derived from class name — override to customize |
+
+### `UIViewController` extension
+
+| Member | Description |
+|---|---|
+| `var screenName: String` | Strips `ViewController` / `Controller` / `View` / `Screen` suffix |
 
 ### `InsightMessage`
 

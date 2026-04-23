@@ -20,7 +20,7 @@ extension AppInsight {
 
 extension UIViewController {
     /// Sınıf adından otomatik türetilen ekran adı.
-    public var aiScreenName: String {
+    public var screenName: String {
         AppInsight.screenName(from: type(of: self))
     }
 }
@@ -31,23 +31,23 @@ extension UIViewController {
 ///
 /// ```swift
 /// // Yalnızca miras al — başka bir şey gerekmez.
-/// class HomeViewController: AIBaseViewController { ... }
+/// class HomeViewController: InsightBaseViewController { ... }
 ///
 /// // Adı özelleştirmek istersen override et:
-/// class HomeViewController: AIBaseViewController {
-///     override var aiScreenName: String { "Ana Sayfa" }
+/// class HomeViewController: InsightBaseViewController {
+///     override var screenName: String { "Ana Sayfa" }
 /// }
 /// ```
-open class AIBaseViewController: UIViewController {
+open class InsightBaseViewController: UIViewController {
 
     open override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        AppInsight.shared.screenDidAppear(aiScreenName)
+        AppInsight.shared.screenDidAppear(screenName)
     }
 
     open override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
-        AppInsight.shared.screenDidDisappear(aiScreenName)
+        AppInsight.shared.screenDidDisappear(screenName)
     }
 }
 
@@ -58,19 +58,19 @@ extension AppInsight {
     /// Controller referansından otomatik isim türeterek ekran görünümünü izler.
     ///
     /// ```swift
-    /// // AIBaseViewController'dan türemek istemiyorsan:
+    /// // InsightBaseViewController'dan türemek istemiyorsan:
     /// override func viewDidAppear(_ animated: Bool) {
     ///     super.viewDidAppear(animated)
     ///     AppInsight.shared.screenDidAppear(for: self)
     /// }
     /// ```
     public func screenDidAppear(for viewController: UIViewController) {
-        screenDidAppear(viewController.aiScreenName)
+        screenDidAppear(viewController.screenName)
     }
 
     /// Controller referansından otomatik isim türeterek ekran kapanışını izler.
     public func screenDidDisappear(for viewController: UIViewController) {
-        screenDidDisappear(viewController.aiScreenName)
+        screenDidDisappear(viewController.screenName)
     }
 }
 
@@ -93,7 +93,7 @@ extension View {
     /// struct HomeView: View {
     ///     var body: some View {
     ///         Text("Home")
-    ///             .trackScreen("Home")       // explicit isim
+    ///             .trackScreen("Home")
     ///     }
     /// }
     /// ```
