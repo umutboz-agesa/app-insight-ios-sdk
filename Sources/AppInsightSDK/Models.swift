@@ -48,15 +48,17 @@ struct SdkInitPayload {
 
     var dict: [String: Any] {
         [
-            "type":        "sdk_init",
-            "api_key":     apiKey,
-            "device_id":   deviceId,
-            "session_id":  sessionId,
-            "platform":    platform,
-            "bundle_id":   bundleId,
-            "app_version": appVersion,
-            "os_version":  osVersion,
-            "model":       model,
+            "type":       "sdk_init",
+            "api_key":    apiKey,
+            "session_id": sessionId,
+            "bundle_id":  bundleId,
+            "device": [
+                "id":          deviceId,
+                "platform":    platform,
+                "app_version": appVersion,
+                "os_version":  osVersion,
+                "model":       model,
+            ] as [String: Any],
         ]
     }
 }
