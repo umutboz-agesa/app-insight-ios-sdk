@@ -26,29 +26,50 @@ public final class AppInsight {
     private var deviceId: String = ""
     private var sessionId: String = UUID().uuidString
     private var isInitialized = false
+    private(set) var environment: AppInsightEnvironment = .local
 
     // MARK: - Initialize
 
     /// SDK'yı başlatır ve backend'e bağlanır.
+    ///
     /// - Parameters:
     ///   - apiKey: Portal'den alınan API anahtarı.
-    ///   - deviceId: Cihazın stabil kimliği. Önerilen: `UIDevice.current.identifierForVendor`.
-    ///   - serverURL: WebSocket sunucu adresi. Default: `ws://localhost:3001/sdk`.
+    ///   - deviceId: Cihazın stabil kimliği. Önerilen: `UIDevice.current.identifierForVendor?.uuidString`.
+    ///   - environment: Bağlanılacak backend ortamı. Default: `.local` (localhost:3001).
+    ///
+    /// Bundle ID güvenlik doğrulaması için `Info.plist`'ten otomatik okunur —
+    /// geliştirici tarafından ayrıca sağlanması gerekmez.
+    ///
+    /// ```swift
+    /// // Geliştirme
+    /// AppInsight.shared.initialize(apiKey: "ak_...", deviceId: id)
+    ///
+    /// // Prodüksiyon
+    /// AppInsight.shared.initialize(apiKey: "ak_...", deviceId: id, environment: .prod)
+    ///
+    /// // Özel URL
+    /// AppInsight.shared.initialize(
+    ///     apiKey: "ak_...",
+    ///     deviceId: id,
+    ///     environment: .custom(URL(string: "wss://my.server.com/sdk")!)
+    /// )
+    /// ```
     public func initialize(
         apiKey: String,
         deviceId: String,
-        serverURL: URL = URL(string: "ws://localhost:3001/sdk")!
+        environment: AppInsightEnvironment = .local
     ) {
-        self.apiKey   = apiKey
-        self.deviceId = deviceId
-        self.sessionId = UUID().uuidString
+        self.apiKey      = apiKey
+        self.deviceId    = deviceId
+        self.environment = environment
+        self.sessionId   = UUID().uuidString
 
-        let manager = WebSocketManager(url: serverURL)
+        AILogger.info("AppInsight initializing — env: \(environment), session: \(sessionId)")
+
+        let manager = WebSocketManager(url: environment.wsURL)
         manager.delegate = self
         wsManager = manager
         manager.connect()
-
-        AILogger.info("AppInsight initializing — session: \(sessionId)")
     }
 
     /// Bağlantıyı kapatır ve tracking'i durdurur.
@@ -66,12 +87,12 @@ public final class AppInsight {
         guard isInitialized else { return }
         let ts = tracker.appeared(name)
         send(.screenEvent(ScreenEventPayload(
-            apiKey:    apiKey,
-            deviceId:  deviceId,
-            sessionId: sessionId,
-            screen:    name,
-            event:     "appeared",
-            ts:        ts,
+            apiKey:     apiKey,
+            deviceId:   deviceId,
+            sessionId:  sessionId,
+            screen:     name,
+            event:      "appeared",
+            ts:         ts,
             durationMs: nil
         )))
     }
@@ -81,27 +102,30 @@ public final class AppInsight {
         guard isInitialized else { return }
         guard let (ts, durationMs) = tracker.disappeared(name) else { return }
         send(.screenEvent(ScreenEventPayload(
-            apiKey:    apiKey,
-            deviceId:  deviceId,
-            sessionId: sessionId,
-            screen:    name,
-            event:     "disappeared",
-            ts:        ts,
+            apiKey:     apiKey,
+            deviceId:   deviceId,
+            sessionId:  sessionId,
+            screen:     name,
+            event:      "disappeared",
+            ts:         ts,
             durationMs: durationMs
         )))
     }
 
-    // MARK: - Helpers
+    // MARK: - Private helpers
 
     private func send(_ message: OutboundMessage) {
         wsManager?.send(message)
     }
 
     private func sendInit() {
-        let bundleId = Bundle.main.bundleIdentifier ?? ""
-        let appVersion = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? ""
-        let osVersion = UIDevice.current.systemVersion
-        let model = Self.deviceModel()
+        // Bundle ID Info.plist'ten otomatik alınır — elle verilmesi gerekmez.
+        let bundleId   = Bundle.main.bundleIdentifier ?? ""
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+        let osVersion  = UIDevice.current.systemVersion
+        let model      = Self.deviceModel()
+
+        AILogger.info("sdk_init — bundle: \(bundleId), version: \(appVersion), os: \(osVersion), model: \(model)")
 
         send(.sdkInit(SdkInitPayload(
             apiKey:     apiKey,
@@ -119,11 +143,10 @@ public final class AppInsight {
         var info = utsname()
         uname(&info)
         let mirror = Mirror(reflecting: info.machine)
-        let identifier = mirror.children.reduce("") { id, element in
+        return mirror.children.reduce("") { id, element in
             guard let value = element.value as? Int8, value != 0 else { return id }
             return id + String(UnicodeScalar(UInt8(value)))
         }
-        return identifier
     }
 }
 
@@ -132,7 +155,7 @@ public final class AppInsight {
 extension AppInsight: WebSocketManagerDelegate {
 
     func webSocketDidConnect() {
-        AILogger.info("WS connected — sending sdk_init")
+        AILogger.info("WS connected → sending sdk_init")
         sendInit()
     }
 
@@ -142,6 +165,7 @@ extension AppInsight: WebSocketManagerDelegate {
 
     func webSocketDidReceive(_ message: InboundMessage) {
         switch message {
+
         case .initOk(let appId, let sessionId):
             AILogger.info("init_ok — app: \(appId), session: \(sessionId)")
             isInitialized = true
@@ -152,9 +176,8 @@ extension AppInsight: WebSocketManagerDelegate {
             wsManager?.disconnect()
             wsManager = nil
 
-        case .configUpdate(let config, let screens):
+        case .configUpdate(_, let screens):
             AILogger.info("config_update — \(screens.count) screens")
-            _ = config   // ileride kullanılabilir
 
         case .insightPush(let insight):
             AILogger.info("insight_push: \(insight.title)")
