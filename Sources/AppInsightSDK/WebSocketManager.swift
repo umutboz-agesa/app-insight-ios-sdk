@@ -31,7 +31,8 @@ final class WebSocketManager: NSObject {
         session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
         task = session?.webSocketTask(with: url)
         task?.resume()
-        listen()
+        // listen() is called in didOpenWithProtocol — not here — to avoid
+        // -1005 errors that occur when receive() is called before the handshake completes
     }
 
     func disconnect() {
@@ -128,6 +129,7 @@ extension WebSocketManager: URLSessionWebSocketDelegate {
         AILogger.info("WS connected")
         reconnectAttempts = 0
         startPing()
+        listen()
         DispatchQueue.main.async { self.delegate?.webSocketDidConnect() }
     }
 
