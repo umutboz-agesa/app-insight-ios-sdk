@@ -107,6 +107,29 @@ final class AppInsightSDKTests: XCTestCase {
         XCTAssertEqual(json?["platform"] as? String, "ios")
     }
 
+    func testScreenNameDerivation() {
+        XCTAssertEqual(AppInsight.screenName(from: NSClassFromString("HomeViewController") ?? NSObject.self), "NSObject")
+
+        // Suffix stripping rules
+        let cases: [(String, String)] = [
+            ("HomeViewController",    "Home"),
+            ("CheckoutController",    "Checkout"),
+            ("ProfileView",           "Profile"),
+            ("OnboardingScreen",      "Onboarding"),
+            ("Dashboard",             "Dashboard"),   // no suffix — unchanged
+        ]
+        for (input, expected) in cases {
+            var name = input
+            for suffix in ["ViewController", "Controller", "View", "Screen"] {
+                if name.hasSuffix(suffix) {
+                    name = String(name.dropLast(suffix.count))
+                    break
+                }
+            }
+            XCTAssertEqual(name, expected, "Failed for input: \(input)")
+        }
+    }
+
     func testScreenEventPayloadSerialization() {
         let payload = ScreenEventPayload(
             apiKey: "ak_test", deviceId: "dev-1", sessionId: "sess-1",
