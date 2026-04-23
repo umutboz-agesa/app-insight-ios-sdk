@@ -21,39 +21,17 @@ public final class AppInsight {
 
     private var wsManager: WebSocketManager?
     private let tracker = ScreenTracker()
+    private let lock = NSLock()
 
     private var apiKey: String = ""
     private var deviceId: String = ""
     private var sessionId: String = UUID().uuidString
     private var isInitialized = false
+    private var pendingEvents: [OutboundMessage] = []
     private(set) var environment: AppInsightEnvironment = .local
 
     // MARK: - Initialize
 
-    /// SDK'yı başlatır ve backend'e bağlanır.
-    ///
-    /// - Parameters:
-    ///   - apiKey: Portal'den alınan API anahtarı.
-    ///   - deviceId: Cihazın stabil kimliği. Önerilen: `UIDevice.current.identifierForVendor?.uuidString`.
-    ///   - environment: Bağlanılacak backend ortamı. Default: `.local` (localhost:3001).
-    ///
-    /// Bundle ID güvenlik doğrulaması için `Info.plist`'ten otomatik okunur —
-    /// geliştirici tarafından ayrıca sağlanması gerekmez.
-    ///
-    /// ```swift
-    /// // Geliştirme
-    /// AppInsight.shared.initialize(apiKey: "ak_...", deviceId: id)
-    ///
-    /// // Prodüksiyon
-    /// AppInsight.shared.initialize(apiKey: "ak_...", deviceId: id, environment: .prod)
-    ///
-    /// // Özel URL
-    /// AppInsight.shared.initialize(
-    ///     apiKey: "ak_...",
-    ///     deviceId: id,
-    ///     environment: .custom(URL(string: "wss://my.server.com/sdk")!)
-    /// )
-    /// ```
     public func initialize(
         apiKey: String,
         deviceId: String,
@@ -63,6 +41,7 @@ public final class AppInsight {
         self.deviceId    = deviceId
         self.environment = environment
         self.sessionId   = UUID().uuidString
+        self.pendingEvents = []
 
         AILogger.info("AppInsight initializing — env: \(environment), session: \(sessionId)")
 
@@ -77,6 +56,7 @@ public final class AppInsight {
         wsManager?.disconnect()
         wsManager = nil
         isInitialized = false
+        pendingEvents = []
         AILogger.info("AppInsight disconnected")
     }
 
@@ -84,9 +64,8 @@ public final class AppInsight {
 
     /// Ekran görünür olduğunda çağrılır.
     public func screenDidAppear(_ name: String) {
-        guard isInitialized else { return }
         let ts = tracker.appeared(name)
-        send(.screenEvent(ScreenEventPayload(
+        enqueue(.screenEvent(ScreenEventPayload(
             apiKey:     apiKey,
             deviceId:   deviceId,
             sessionId:  sessionId,
@@ -99,9 +78,8 @@ public final class AppInsight {
 
     /// Ekran kapandığında çağrılır.
     public func screenDidDisappear(_ name: String) {
-        guard isInitialized else { return }
         guard let (ts, durationMs) = tracker.disappeared(name) else { return }
-        send(.screenEvent(ScreenEventPayload(
+        enqueue(.screenEvent(ScreenEventPayload(
             apiKey:     apiKey,
             deviceId:   deviceId,
             sessionId:  sessionId,
@@ -114,12 +92,29 @@ public final class AppInsight {
 
     // MARK: - Private helpers
 
-    private func send(_ message: OutboundMessage) {
-        wsManager?.send(message)
+    // Buffers the event until init_ok, then sends immediately after
+    private func enqueue(_ message: OutboundMessage) {
+        lock.lock()
+        defer { lock.unlock() }
+        if isInitialized {
+            wsManager?.send(message)
+        } else {
+            pendingEvents.append(message)
+        }
+    }
+
+    private func flushPending() {
+        lock.lock()
+        let events = pendingEvents
+        pendingEvents = []
+        lock.unlock()
+
+        guard !events.isEmpty else { return }
+        AILogger.info("Flushing \(events.count) buffered events")
+        events.forEach { wsManager?.send($0) }
     }
 
     private func sendInit() {
-        // Bundle ID Info.plist'ten otomatik alınır — elle verilmesi gerekmez.
         let bundleId   = Bundle.main.bundleIdentifier ?? ""
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
         let osVersion  = UIDevice.current.systemVersion
@@ -127,7 +122,7 @@ public final class AppInsight {
 
         AILogger.info("sdk_init — bundle: \(bundleId), version: \(appVersion), os: \(osVersion), model: \(model)")
 
-        send(.sdkInit(SdkInitPayload(
+        wsManager?.send(.sdkInit(SdkInitPayload(
             apiKey:     apiKey,
             deviceId:   deviceId,
             sessionId:  sessionId,
@@ -169,10 +164,12 @@ extension AppInsight: WebSocketManagerDelegate {
         case .initOk(let appId, let sessionId):
             AILogger.info("init_ok — app: \(appId), session: \(sessionId)")
             isInitialized = true
+            flushPending()
 
         case .initError(let code, let msg):
             AILogger.error("init_error [\(code)]: \(msg) — tracking disabled")
             isInitialized = false
+            pendingEvents = []
             wsManager?.disconnect()
             wsManager = nil
 
