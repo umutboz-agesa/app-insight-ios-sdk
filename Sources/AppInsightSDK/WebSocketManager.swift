@@ -28,11 +28,22 @@ final class WebSocketManager: NSObject {
     func connect() {
         isIntentionalClose = false
         let config = URLSessionConfiguration.default
-        session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
-        task = session?.webSocketTask(with: url)
+        config.waitsForConnectivity = true
+        // Explicit HTTP/1.1 upgrade headers — prevents URLSessionWebSocketTask from
+        // attempting HTTP/2 WebSocket (RFC 8441) which Node.js ws does not support
+        config.httpAdditionalHeaders = [
+            "Upgrade": "websocket",
+            "Connection": "Upgrade",
+        ]
+        let queue = OperationQueue()
+        queue.maxConcurrentOperationCount = 1
+        session = URLSession(configuration: config, delegate: self, delegateQueue: queue)
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 30
+        task = session?.webSocketTask(with: request)
         task?.resume()
-        // listen() is called in didOpenWithProtocol — not here — to avoid
-        // -1005 errors that occur when receive() is called before the handshake completes
+        // listen() is called in didOpenWithProtocol — not before — to avoid
+        // -1005 errors that occur when receive() is called before handshake completes
     }
 
     func disconnect() {
