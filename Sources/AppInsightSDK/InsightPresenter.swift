@@ -27,7 +27,12 @@ public final class DefaultInsightPresenter: InsightPresenting {
     // MARK: Banner
 
     private func presentBanner(_ insight: InsightMessage, in window: UIWindow, onAction: ((InsightMessage) -> Void)?) {
-        let view = InsightBannerView(insight: insight) { onAction?(insight) }
+        let permanentDismiss = { AppInsight.shared.permanentlyDismiss(insightId: insight.id) }
+        let view = InsightBannerView(
+            insight: insight,
+            onAction: { onAction?(insight) },
+            onPermanentDismiss: permanentDismiss
+        )
         window.addSubview(view)
         view.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -70,7 +75,13 @@ public final class DefaultInsightPresenter: InsightPresenting {
         let dismiss = { UIView.animate(withDuration: 0.25, animations: { overlay.alpha = 0 }) { _ in overlay.removeFromSuperview() } }
         overlay.onTap = dismiss  // backdrop tap → dismiss
 
-        let card = InsightModalView(insight: insight, onAction: { onAction?(insight); dismiss() }, onDismiss: dismiss)
+        let permanentDismiss = { AppInsight.shared.permanentlyDismiss(insightId: insight.id) }
+        let card = InsightModalView(
+            insight: insight,
+            onAction: { onAction?(insight); dismiss() },
+            onDismiss: dismiss,
+            onPermanentDismiss: permanentDismiss
+        )
         overlay.addSubview(card)
         card.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([

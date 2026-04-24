@@ -5,9 +5,15 @@ import UIKit
 public final class InsightBannerView: UIView {
 
     private let onAction: (() -> Void)?
+    private let onPermanentDismiss: (() -> Void)?
 
-    public init(insight: InsightMessage, onAction: (() -> Void)? = nil) {
+    public init(
+        insight: InsightMessage,
+        onAction: (() -> Void)? = nil,
+        onPermanentDismiss: (() -> Void)? = nil
+    ) {
         self.onAction = onAction
+        self.onPermanentDismiss = onPermanentDismiss
         super.init(frame: .zero)
         build(insight: insight)
     }
@@ -66,6 +72,17 @@ public final class InsightBannerView: UIView {
             stack.addArrangedSubview(btn)
         }
 
+        // — permanent dismiss —
+        if onPermanentDismiss != nil {
+            let btn = UIButton(type: .system)
+            btn.setTitle("Bir daha gösterme", for: .normal)
+            btn.setTitleColor(.tertiaryLabel, for: .normal)
+            btn.titleLabel?.font = .systemFont(ofSize: 12)
+            btn.contentHorizontalAlignment = .leading
+            btn.addTarget(self, action: #selector(handlePermanentDismiss), for: .touchUpInside)
+            stack.addArrangedSubview(btn)
+        }
+
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: topAnchor, constant: 14),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -14),
@@ -90,6 +107,11 @@ public final class InsightBannerView: UIView {
 
     @objc private func handleAction() {
         onAction?()
+        selfDismiss()
+    }
+
+    @objc private func handlePermanentDismiss() {
+        onPermanentDismiss?()
         selfDismiss()
     }
 }

@@ -14,6 +14,8 @@ struct InsightOverlayModifier: ViewModifier {
                     store.onAction?(insight)
                 } onDismiss: {
                     store.dismiss()
+                } onPermanentDismiss: {
+                    store.permanentDismiss()
                 }
                 .transition(.move(edge: displayEdge(for: insight)).combined(with: .opacity))
                 .zIndex(999)
@@ -51,12 +53,13 @@ struct InsightOverlayView: View {
     let insight: InsightMessage
     let onAction: () -> Void
     let onDismiss: () -> Void
+    let onPermanentDismiss: () -> Void
 
     var body: some View {
         switch insight.display?.style ?? "banner" {
-        case "modal": InsightModalSwiftUI(insight: insight, onAction: onAction, onDismiss: onDismiss)
+        case "modal": InsightModalSwiftUI(insight: insight, onAction: onAction, onDismiss: onDismiss, onPermanentDismiss: onPermanentDismiss)
         case "toast":  InsightToastSwiftUI(insight: insight, onDismiss: onDismiss)
-        default:       InsightBannerSwiftUI(insight: insight, onAction: onAction, onDismiss: onDismiss)
+        default:       InsightBannerSwiftUI(insight: insight, onAction: onAction, onDismiss: onDismiss, onPermanentDismiss: onPermanentDismiss)
         }
     }
 }
@@ -68,6 +71,7 @@ struct InsightBannerSwiftUI: View {
     let insight: InsightMessage
     let onAction: () -> Void
     let onDismiss: () -> Void
+    let onPermanentDismiss: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -97,6 +101,12 @@ struct InsightBannerSwiftUI: View {
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.accentColor)
                 }
+            }
+
+            Button(action: { onPermanentDismiss() }) {
+                Text("Bir daha gösterme")
+                    .font(.system(size: 12))
+                    .foregroundColor(Color(UIColor.tertiaryLabel))
             }
         }
         .padding(.horizontal, 16)
@@ -161,6 +171,7 @@ struct InsightModalSwiftUI: View {
     let insight: InsightMessage
     let onAction: () -> Void
     let onDismiss: () -> Void
+    let onPermanentDismiss: () -> Void
 
     var body: some View {
         ZStack {
@@ -207,6 +218,13 @@ struct InsightModalSwiftUI: View {
                 Button(action: onDismiss) {
                     Text("Kapat")
                         .font(.system(size: 14))
+                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                        .frame(maxWidth: .infinity)
+                }
+
+                Button(action: { onPermanentDismiss() }) {
+                    Text("Bir daha gösterme")
+                        .font(.system(size: 12))
                         .foregroundColor(Color(UIColor.tertiaryLabel))
                         .frame(maxWidth: .infinity)
                 }

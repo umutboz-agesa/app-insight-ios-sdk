@@ -3,16 +3,19 @@ import UIKit
 /// SDK default modal — ortalanmış kart, karartılmış arka plan, büyük aksiyon butonu.
 public final class InsightModalView: UIView {
 
-    private let onAction:  (() -> Void)?
-    private let onDismiss: (() -> Void)?
+    private let onAction:          (() -> Void)?
+    private let onDismiss:         (() -> Void)?
+    private let onPermanentDismiss: (() -> Void)?
 
     public init(
         insight: InsightMessage,
-        onAction:  (() -> Void)? = nil,
-        onDismiss: (() -> Void)? = nil
+        onAction:          (() -> Void)? = nil,
+        onDismiss:         (() -> Void)? = nil,
+        onPermanentDismiss: (() -> Void)? = nil
     ) {
-        self.onAction  = onAction
-        self.onDismiss = onDismiss
+        self.onAction           = onAction
+        self.onDismiss          = onDismiss
+        self.onPermanentDismiss = onPermanentDismiss
         super.init(frame: .zero)
         build(insight: insight)
     }
@@ -89,6 +92,16 @@ public final class InsightModalView: UIView {
         closeLink.addTarget(self, action: #selector(dismiss), for: .touchUpInside)
         stack.addArrangedSubview(closeLink)
 
+        // — permanent dismiss —
+        if onPermanentDismiss != nil {
+            let btn = UIButton(type: .system)
+            btn.setTitle("Bir daha gösterme", for: .normal)
+            btn.setTitleColor(.tertiaryLabel, for: .normal)
+            btn.titleLabel?.font = .systemFont(ofSize: 12)
+            btn.addTarget(self, action: #selector(handlePermanentDismiss), for: .touchUpInside)
+            stack.addArrangedSubview(btn)
+        }
+
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: topAnchor, constant: 16),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -20),
@@ -97,6 +110,7 @@ public final class InsightModalView: UIView {
         ])
     }
 
-    @objc private func dismiss()      { onDismiss?() }
-    @objc private func handleAction() { onAction?() }
+    @objc private func dismiss()               { onDismiss?() }
+    @objc private func handleAction()          { onAction?() }
+    @objc private func handlePermanentDismiss() { onPermanentDismiss?(); onDismiss?() }
 }

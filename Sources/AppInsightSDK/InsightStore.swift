@@ -21,4 +21,11 @@ public final class InsightStore: ObservableObject, InsightPresenting {
     public func dismiss() {
         DispatchQueue.main.async { self.pending = nil }
     }
+
+    /// Kalıcı olarak gizle: UserDefaults'a yazar + sunucuya bildirir.
+    public func permanentDismiss() {
+        guard let insight = pending else { return }
+        AppInsight.shared.permanentlyDismiss(insightId: insight.id)
+        dismiss()
+    }
 }

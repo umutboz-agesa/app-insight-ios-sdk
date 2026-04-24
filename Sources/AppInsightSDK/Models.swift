@@ -27,11 +27,13 @@ public struct InsightAction {
 enum OutboundMessage {
     case sdkInit(SdkInitPayload)
     case screenEvent(ScreenEventPayload)
+    case insightOptout(InsightOptoutPayload)
 
     func toJSON() -> Data? {
         switch self {
-        case .sdkInit(let p):  return try? JSONSerialization.data(withJSONObject: p.dict)
-        case .screenEvent(let p): return try? JSONSerialization.data(withJSONObject: p.dict)
+        case .sdkInit(let p):        return try? JSONSerialization.data(withJSONObject: p.dict)
+        case .screenEvent(let p):    return try? JSONSerialization.data(withJSONObject: p.dict)
+        case .insightOptout(let p):  return try? JSONSerialization.data(withJSONObject: p.dict)
         }
     }
 }
@@ -87,6 +89,21 @@ struct ScreenEventPayload {
             "device_id":  deviceId,
             "session_id": sessionId,
             "payload":    payload,
+        ]
+    }
+}
+
+struct InsightOptoutPayload {
+    let apiKey: String
+    let deviceId: String
+    let insightId: String
+
+    var dict: [String: Any] {
+        [
+            "type":       "insight_optout",
+            "api_key":    apiKey,
+            "device_id":  deviceId,
+            "insight_id": insightId,
         ]
     }
 }

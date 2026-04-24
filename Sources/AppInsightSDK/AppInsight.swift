@@ -72,6 +72,24 @@ public final class AppInsight {
         AILogger.info("AppInsight disconnected")
     }
 
+    // MARK: - Opt-out (permanent dismiss)
+
+    /// Cihazda bu insight'ı kalıcı olarak gizler ve sunucuya bildirir.
+    /// `InsightBannerView` / `InsightModalView` içinden otomatik çağrılır.
+    public func permanentlyDismiss(insightId: String) {
+        UserDefaults.standard.set(true, forKey: "insight_optout_\(insightId)")
+        AILogger.info("insight optout (local) — \(insightId)")
+        enqueue(.insightOptout(InsightOptoutPayload(
+            apiKey:    apiKey,
+            deviceId:  deviceId,
+            insightId: insightId
+        )))
+    }
+
+    func isOptedOut(insightId: String) -> Bool {
+        UserDefaults.standard.bool(forKey: "insight_optout_\(insightId)")
+    }
+
     // MARK: - Screen tracking
 
     /// Ekran görünür olduğunda çağrılır. (Main thread)
@@ -229,6 +247,10 @@ extension AppInsight: WebSocketManagerDelegate {
         case .insightPush(let insight):
             AILogger.info("insight_push: \(insight.title)")
             DispatchQueue.main.async {
+                if self.isOptedOut(insightId: insight.id) {
+                    AILogger.info("insight_push discarded — opted out: \(insight.id)")
+                    return
+                }
                 if let target = insight.targetScreen, target != self.currentScreen {
                     AILogger.info("insight_push discarded — target '\(target)' ≠ current '\(self.currentScreen ?? "nil")'")
                     return
