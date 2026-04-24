@@ -233,7 +233,7 @@ extension AppInsight: WebSocketManagerDelegate {
                     AILogger.info("insight_push discarded — target '\(target)' ≠ current '\(self.currentScreen ?? "nil")'")
                     return
                 }
-                self.presenter.present(insight, onAction: self.onInsightAction.map { cb in { cb(insight) } })
+                self.presenter.present(insight, onAction: self.onInsightAction)
             }
 
         case .dataPush(let event, let data):
