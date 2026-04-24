@@ -30,6 +30,11 @@ public final class AppInsight {
     private var pendingEvents: [OutboundMessage] = []
     private(set) var environment: AppInsightEnvironment = .local
 
+    // Screen guard + dwell (main thread only)
+    private var currentScreen: String? = nil
+    private var dwellTimers: [String: [DispatchWorkItem]] = [:]
+    private let dwellThresholds: [Int] = [3_000, 10_000, 30_000, 60_000]
+
     // MARK: - Initialize
 
     public func initialize(
@@ -62,8 +67,10 @@ public final class AppInsight {
 
     // MARK: - Screen tracking
 
-    /// Ekran görünür olduğunda çağrılır.
+    /// Ekran görünür olduğunda çağrılır. (Main thread)
     public func screenDidAppear(_ name: String) {
+        currentScreen = name
+        scheduleDwellTimers(for: name)
         let ts = tracker.appeared(name)
         enqueue(.screenEvent(ScreenEventPayload(
             apiKey:     apiKey,
@@ -76,8 +83,10 @@ public final class AppInsight {
         )))
     }
 
-    /// Ekran kapandığında çağrılır.
+    /// Ekran kapandığında çağrılır. (Main thread)
     public func screenDidDisappear(_ name: String) {
+        cancelDwellTimers(for: name)
+        if currentScreen == name { currentScreen = nil }
         guard let (ts, durationMs) = tracker.disappeared(name) else { return }
         enqueue(.screenEvent(ScreenEventPayload(
             apiKey:     apiKey,
@@ -101,6 +110,40 @@ public final class AppInsight {
         } else {
             pendingEvents.append(message)
         }
+    }
+
+    // MARK: - Dwell timers
+
+    private func scheduleDwellTimers(for screen: String) {
+        cancelDwellTimers(for: screen)
+        let items: [DispatchWorkItem] = dwellThresholds.map { ms in
+            let item = DispatchWorkItem { [weak self] in
+                guard let self, self.currentScreen == screen else { return }
+                self.sendDwellEvent(screen: screen, durationMs: ms)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(ms), execute: item)
+            return item
+        }
+        dwellTimers[screen] = items
+    }
+
+    private func cancelDwellTimers(for screen: String) {
+        dwellTimers[screen]?.forEach { $0.cancel() }
+        dwellTimers.removeValue(forKey: screen)
+    }
+
+    private func sendDwellEvent(screen: String, durationMs: Int) {
+        let ts = Int64(Date().timeIntervalSince1970 * 1000)
+        AILogger.info("dwell — \(screen), \(durationMs / 1000)s")
+        enqueue(.screenEvent(ScreenEventPayload(
+            apiKey:     apiKey,
+            deviceId:   deviceId,
+            sessionId:  sessionId,
+            screen:     screen,
+            event:      "dwell",
+            ts:         ts,
+            durationMs: durationMs
+        )))
     }
 
     private func flushPending() {
@@ -178,7 +221,13 @@ extension AppInsight: WebSocketManagerDelegate {
 
         case .insightPush(let insight):
             AILogger.info("insight_push: \(insight.title)")
-            onInsight?(insight)
+            DispatchQueue.main.async {
+                if let target = insight.targetScreen, target != self.currentScreen {
+                    AILogger.info("insight_push discarded — target '\(target)' ≠ current '\(self.currentScreen ?? "nil")'")
+                    return
+                }
+                self.onInsight?(insight)
+            }
 
         case .dataPush(let event, let data):
             AILogger.info("data_push: \(event)")
