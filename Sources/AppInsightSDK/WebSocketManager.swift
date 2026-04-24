@@ -17,7 +17,7 @@ final class WebSocketManager: NSObject {
 
     private var isIntentionalClose = false
     private var reconnectAttempts = 0
-    private let maxReconnectAttempts = 5
+    private let maxReconnectAttempts = 10
 
     init(url: URL) {
         self.url = url
@@ -27,8 +27,12 @@ final class WebSocketManager: NSObject {
 
     func connect() {
         isIntentionalClose = false
+        teardown()  // her zaman temiz başla
+
         let config = URLSessionConfiguration.default
-        config.waitsForConnectivity = true
+        config.waitsForConnectivity = false  // sunucu kapalıysa beklemek yerine hemen hata ver
+        config.timeoutIntervalForRequest = 10
+        config.timeoutIntervalForResource = 30
         // Explicit HTTP/1.1 upgrade headers — prevents URLSessionWebSocketTask from
         // attempting HTTP/2 WebSocket (RFC 8441) which Node.js ws does not support
         config.httpAdditionalHeaders = [
@@ -39,7 +43,7 @@ final class WebSocketManager: NSObject {
         queue.maxConcurrentOperationCount = 1
         session = URLSession(configuration: config, delegate: self, delegateQueue: queue)
         var request = URLRequest(url: url)
-        request.timeoutInterval = 30
+        request.timeoutInterval = 10
         task = session?.webSocketTask(with: request)
         task?.resume()
         // listen() is called in didOpenWithProtocol — not before — to avoid
@@ -48,6 +52,10 @@ final class WebSocketManager: NSObject {
 
     func disconnect() {
         isIntentionalClose = true
+        teardown()
+    }
+
+    private func teardown() {
         stopPing()
         task?.cancel(with: .normalClosure, reason: nil)
         task = nil
@@ -113,18 +121,24 @@ final class WebSocketManager: NSObject {
     // MARK: - Reconnect
 
     private func handleDisconnect() {
-        stopPing()
-        task = nil
+        teardown()
         DispatchQueue.main.async { self.delegate?.webSocketDidDisconnect() }
 
-        guard !isIntentionalClose, reconnectAttempts < maxReconnectAttempts else { return }
+        guard !isIntentionalClose else { return }
 
-        let delay = min(pow(2.0, Double(reconnectAttempts)), 30.0)
-        reconnectAttempts += 1
+        let delay: Double
+        if reconnectAttempts < maxReconnectAttempts {
+            delay = min(pow(2.0, Double(reconnectAttempts)), 60.0)
+            reconnectAttempts += 1
+        } else {
+            // maxReconnectAttempts aşıldı, 60s'de bir passive retry
+            delay = 60.0
+        }
+
         AILogger.info("Reconnecting in \(Int(delay))s (attempt \(reconnectAttempts))")
-
         DispatchQueue.global().asyncAfter(deadline: .now() + delay) { [weak self] in
-            self?.connect()
+            guard let self, !self.isIntentionalClose else { return }
+            self.connect()
         }
     }
 }
