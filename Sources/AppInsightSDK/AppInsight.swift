@@ -33,7 +33,10 @@ public final class AppInsight {
     // Screen guard + dwell (main thread only)
     private var currentScreen: String? = nil
     private var dwellTimers: [String: [DispatchWorkItem]] = [:]
-    private let dwellThresholds: [Int] = [3_000, 10_000, 30_000, 60_000]
+
+    /// SDK'nın dwell event göndereceği süreler (ms). Default: 3s, 10s, 30s, 60s.
+    /// Örn: `AppInsight.shared.dwellThresholds = [5_000, 15_000]`
+    public var dwellThresholds: [Int] = [3_000, 10_000, 30_000, 60_000]
 
     // MARK: - Initialize
 
