@@ -4,17 +4,9 @@ import SwiftUI
 // MARK: - Screen name derivation
 
 extension AppInsight {
-    /// Sınıf adından ekran adı türetir.
-    /// `HomeViewController` → `"Home"`, `CheckoutController` → `"Checkout"`
+    /// Sınıf adını olduğu gibi döndürür — herhangi bir suffix temizleme yapılmaz.
     public static func screenName(from type: AnyClass) -> String {
-        var name = String(describing: type)
-        for suffix in ["ViewController", "Controller", "View", "Screen"] {
-            if name.hasSuffix(suffix) {
-                name = String(name.dropLast(suffix.count))
-                break
-            }
-        }
-        return name
+        String(describing: type)
     }
 }
 
