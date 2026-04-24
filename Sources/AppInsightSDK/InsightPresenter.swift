@@ -56,7 +56,7 @@ public final class DefaultInsightPresenter: InsightPresenting {
     // MARK: Modal
 
     private func presentModal(_ insight: InsightMessage, in window: UIWindow, onAction: ((InsightMessage) -> Void)?) {
-        let overlay = UIView()
+        let overlay = DimmingView()
         overlay.backgroundColor = UIColor.black.withAlphaComponent(0.45)
         overlay.translatesAutoresizingMaskIntoConstraints = false
         window.addSubview(overlay)
@@ -68,6 +68,7 @@ public final class DefaultInsightPresenter: InsightPresenting {
         ])
 
         let dismiss = { UIView.animate(withDuration: 0.25, animations: { overlay.alpha = 0 }) { _ in overlay.removeFromSuperview() } }
+        overlay.onTap = dismiss  // backdrop tap → dismiss
 
         let card = InsightModalView(insight: insight, onAction: { onAction?(insight); dismiss() }, onDismiss: dismiss)
         overlay.addSubview(card)
@@ -84,11 +85,6 @@ public final class DefaultInsightPresenter: InsightPresenting {
             overlay.alpha = 1
             card.transform = .identity
         }
-
-        let tap = UITapGestureRecognizer(target: nil, action: nil)
-        overlay.addGestureRecognizer(tap)
-        // Dismiss on backdrop tap (sadece overlay'e tıklayınca, card'a değil)
-        tap.addTarget(BlockTarget(action: dismiss), action: #selector(BlockTarget.fire))
     }
 
     // MARK: Shared animation
@@ -112,9 +108,12 @@ public final class DefaultInsightPresenter: InsightPresenting {
     }
 }
 
-// Tap gesture helper
-private final class BlockTarget: NSObject {
-    let action: () -> Void
-    init(action: @escaping () -> Void) { self.action = action }
-    @objc func fire() { action() }
+/// Overlay view — sadece doğrudan kendisine dokunulduğunda dismiss eder (card'a değil).
+private final class DimmingView: UIView {
+    var onTap: (() -> Void)?
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesEnded(touches, with: event)
+        guard let touch = touches.first, touch.view === self else { return }
+        onTap?()
+    }
 }
