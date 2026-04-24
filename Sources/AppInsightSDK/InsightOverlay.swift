@@ -80,7 +80,7 @@ struct InsightBannerSwiftUI: View {
                 Button(action: onDismiss) {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.tertiaryLabel)
+                        .foregroundColor(Color(UIColor.tertiaryLabel))
                 }
             }
 
@@ -174,7 +174,7 @@ struct InsightModalSwiftUI: View {
                     Button(action: onDismiss) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 22))
-                            .foregroundColor(.quaternaryLabel)
+                            .foregroundColor(Color(UIColor.quaternaryLabel))
                     }
                 }
 
@@ -207,7 +207,7 @@ struct InsightModalSwiftUI: View {
                 Button(action: onDismiss) {
                     Text("Kapat")
                         .font(.system(size: 14))
-                        .foregroundColor(.tertiary)
+                        .foregroundColor(Color(UIColor.tertiaryLabel))
                         .frame(maxWidth: .infinity)
                 }
             }
