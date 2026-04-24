@@ -9,10 +9,14 @@ public final class AppInsight {
     public static let shared = AppInsight()
     private init() {}
 
-    // MARK: - Public callbacks
+    // MARK: - Public API
 
-    /// Bir insight push alındığında çağrılır (main thread).
-    public var onInsight: ((InsightMessage) -> Void)?
+    /// Insight UI sunucusu. Default: `DefaultInsightPresenter` (UIKit banner/modal/toast).
+    /// SwiftUI için: `AppInsight.shared.presenter = InsightStore.shared`
+    public var presenter: InsightPresenting = DefaultInsightPresenter()
+
+    /// Kullanıcı insight aksiyonuna tıkladığında çağrılır (deeplink, url routing).
+    public var onInsightAction: ((InsightMessage) -> Void)?
 
     /// Bir data push alındığında çağrılır (main thread).
     public var onDataPush: ((_ event: String, _ data: [String: Any]) -> Void)?
@@ -229,7 +233,7 @@ extension AppInsight: WebSocketManagerDelegate {
                     AILogger.info("insight_push discarded — target '\(target)' ≠ current '\(self.currentScreen ?? "nil")'")
                     return
                 }
-                self.onInsight?(insight)
+                self.presenter.present(insight, onAction: self.onInsightAction.map { cb in { cb(insight) } })
             }
 
         case .dataPush(let event, let data):
