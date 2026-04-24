@@ -1,3 +1,4 @@
+import Foundation
 import Combine
 
 /// SwiftUI uygulamaları için insight köprüsü.
