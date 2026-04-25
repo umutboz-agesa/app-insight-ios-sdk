@@ -78,8 +78,11 @@ final class WebSocketManager: NSObject {
     // MARK: - Listen loop
 
     private func listen() {
+        guard let currentSession = session else { return }
         task?.receive { [weak self] result in
-            guard let self else { return }
+            // Guard against stale sessions — teardown() during connect() invalidates the old
+            // session asynchronously; its pending receive closure must not trigger reconnect.
+            guard let self, currentSession === self.session else { return }
             switch result {
             case .success(let message):
                 self.handleRaw(message)
@@ -157,6 +160,7 @@ extension WebSocketManager: URLSessionWebSocketDelegate {
         webSocketTask: URLSessionWebSocketTask,
         didOpenWithProtocol protocol: String?
     ) {
+        guard session === self.session else { return }
         AILogger.info("WS connected")
         reconnectAttempts = 0
         startPing()
@@ -170,12 +174,16 @@ extension WebSocketManager: URLSessionWebSocketDelegate {
         didCloseWith closeCode: URLSessionWebSocketTask.CloseCode,
         reason: Data?
     ) {
+        guard session === self.session else { return }
         AILogger.info("WS closed: \(closeCode.rawValue)")
         handleDisconnect()
     }
 
     // Called when connection attempt fails (backend down, timeout, etc.)
+    // Guard against stale sessions: teardown() invalidates the old session asynchronously,
+    // so its didCompleteWithError fires after the new session is active — must be ignored.
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        guard session === self.session else { return }
         if let error {
             AILogger.error("WS task failed: \(error.localizedDescription)")
             handleDisconnect()
