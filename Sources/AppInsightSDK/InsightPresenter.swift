@@ -27,11 +27,19 @@ public final class DefaultInsightPresenter: InsightPresenting {
     // MARK: Banner
 
     private func presentBanner(_ insight: InsightMessage, in window: UIWindow, onAction: ((InsightMessage) -> Void)?) {
-        let permanentDismiss = { AppInsight.shared.permanentlyDismiss(insightId: insight.id) }
+        let sdk = AppInsight.shared
         let view = InsightBannerView(
             insight: insight,
-            onAction: { onAction?(insight) },
-            onPermanentDismiss: permanentDismiss
+            onAction: {
+                sdk.recordAction(insightId: insight.id, action: "action_clicked")
+                onAction?(insight)
+            },
+            onPermanentDismiss: {
+                sdk.permanentlyDismiss(insightId: insight.id)
+            },
+            onUserClose: {
+                sdk.recordAction(insightId: insight.id, action: "user_closed")
+            }
         )
         window.addSubview(view)
         view.translatesAutoresizingMaskIntoConstraints = false
@@ -40,7 +48,9 @@ public final class DefaultInsightPresenter: InsightPresenting {
             view.leadingAnchor.constraint(equalTo: window.leadingAnchor, constant: 16),
             view.trailingAnchor.constraint(equalTo: window.trailingAnchor, constant: -16),
         ])
-        animate(view, in: window, duration: insight.display?.durationMs ?? 5_000, translation: -12)
+        animate(view, in: window, duration: insight.display?.durationMs ?? 5_000, translation: -12) {
+            sdk.recordAction(insightId: insight.id, action: "auto_closed")
+        }
     }
 
     // MARK: Toast
@@ -55,7 +65,7 @@ public final class DefaultInsightPresenter: InsightPresenting {
             view.leadingAnchor.constraint(greaterThanOrEqualTo: window.leadingAnchor, constant: 24),
             view.trailingAnchor.constraint(lessThanOrEqualTo: window.trailingAnchor, constant: -24),
         ])
-        animate(view, in: window, duration: insight.display?.durationMs ?? 3_000, translation: 12)
+        animate(view, in: window, duration: insight.display?.durationMs ?? 3_000, translation: 12, onAutoDismiss: nil)
     }
 
     // MARK: Modal
@@ -100,13 +110,15 @@ public final class DefaultInsightPresenter: InsightPresenting {
 
     // MARK: Shared animation
 
-    private func animate(_ view: UIView, in window: UIWindow, duration: Int, translation: CGFloat) {
+    private func animate(_ view: UIView, in window: UIWindow, duration: Int, translation: CGFloat, onAutoDismiss: (() -> Void)? = nil) {
         view.alpha = 0
         view.transform = CGAffineTransform(translationX: 0, y: translation)
         UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5) {
             view.alpha = 1; view.transform = .identity
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + Double(duration) / 1000) {
+            guard view.superview != nil else { return }  // already removed by user interaction
+            onAutoDismiss?()
             UIView.animate(withDuration: 0.25, animations: { view.alpha = 0 }) { _ in view.removeFromSuperview() }
         }
     }

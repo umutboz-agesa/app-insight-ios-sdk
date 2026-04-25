@@ -4,16 +4,21 @@ import UIKit
 /// Özelleştirmek için kendi `InsightPresenting` implementasyonunu yaz.
 public final class InsightBannerView: UIView {
 
+    private let insightId: String
     private let onAction: (() -> Void)?
     private let onPermanentDismiss: (() -> Void)?
+    private let onUserClose: (() -> Void)?
 
     public init(
         insight: InsightMessage,
         onAction: (() -> Void)? = nil,
-        onPermanentDismiss: (() -> Void)? = nil
+        onPermanentDismiss: (() -> Void)? = nil,
+        onUserClose: (() -> Void)? = nil
     ) {
+        self.insightId = insight.id
         self.onAction = onAction
         self.onPermanentDismiss = onPermanentDismiss
+        self.onUserClose = onUserClose
         super.init(frame: .zero)
         build(insight: insight)
     }
@@ -31,7 +36,7 @@ public final class InsightBannerView: UIView {
 
         let stack = UIStackView()
         stack.axis = .vertical
-        stack.spacing = 4
+        stack.spacing = 6
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
 
@@ -72,15 +77,36 @@ public final class InsightBannerView: UIView {
             stack.addArrangedSubview(btn)
         }
 
-        // — permanent dismiss —
+        // — permanent dismiss — (separator + belirgin buton)
         if onPermanentDismiss != nil {
+            let separator = UIView()
+            separator.backgroundColor = UIColor.separator
+            separator.translatesAutoresizingMaskIntoConstraints = false
+            separator.heightAnchor.constraint(equalToConstant: 0.5).isActive = true
+            stack.addArrangedSubview(separator)
+
+            let dismissRow = UIStackView()
+            dismissRow.axis = .horizontal
+            dismissRow.alignment = .center
+            dismissRow.spacing = 6
+
+            let icon = UIImageView(image: UIImage(systemName: "bell.slash"))
+            icon.tintColor = .systemOrange
+            icon.contentMode = .scaleAspectFit
+            icon.widthAnchor.constraint(equalToConstant: 14).isActive = true
+            icon.heightAnchor.constraint(equalToConstant: 14).isActive = true
+
             let btn = UIButton(type: .system)
             btn.setTitle("Bir daha gösterme", for: .normal)
-            btn.setTitleColor(.tertiaryLabel, for: .normal)
-            btn.titleLabel?.font = .systemFont(ofSize: 12)
+            btn.setTitleColor(.label, for: .normal)
+            btn.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
             btn.contentHorizontalAlignment = .leading
             btn.addTarget(self, action: #selector(handlePermanentDismiss), for: .touchUpInside)
-            stack.addArrangedSubview(btn)
+            btn.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+            dismissRow.addArrangedSubview(icon)
+            dismissRow.addArrangedSubview(btn)
+            stack.addArrangedSubview(dismissRow)
         }
 
         NSLayoutConstraint.activate([
@@ -102,6 +128,7 @@ public final class InsightBannerView: UIView {
     }
 
     @objc private func selfDismiss() {
+        onUserClose?()
         UIView.animate(withDuration: 0.2, animations: { self.alpha = 0 }) { _ in self.removeFromSuperview() }
     }
 
@@ -112,6 +139,6 @@ public final class InsightBannerView: UIView {
 
     @objc private func handlePermanentDismiss() {
         onPermanentDismiss?()
-        selfDismiss()
+        UIView.animate(withDuration: 0.2, animations: { self.alpha = 0 }) { _ in self.removeFromSuperview() }
     }
 }

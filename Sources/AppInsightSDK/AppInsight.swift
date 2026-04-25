@@ -86,6 +86,17 @@ public final class AppInsight {
         )))
     }
 
+    /// Kullanıcı aksiyonunu sunucuya bildirir (auto_closed, user_closed, action_clicked).
+    func recordAction(insightId: String, action: String) {
+        AILogger.info("insight_action — \(action): \(insightId)")
+        enqueue(.insightAction(InsightActionPayload(
+            apiKey:    apiKey,
+            deviceId:  deviceId,
+            insightId: insightId,
+            action:    action
+        )))
+    }
+
     func isOptedOut(insightId: String) -> Bool {
         UserDefaults.standard.bool(forKey: "insight_optout_\(insightId)")
     }
