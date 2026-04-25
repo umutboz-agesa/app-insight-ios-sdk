@@ -10,6 +10,8 @@ public struct InsightMessage {
     public let targetScreen: String?
     public let display: InsightDisplay?
     public let action: InsightAction?
+    /// Backend'den "opt-out'u görmezden gel, göster" talimatı
+    public let force: Bool
 }
 
 public struct InsightDisplay {
@@ -203,6 +205,7 @@ private func parseInsight(from json: [String: Any]) -> InsightMessage {
         data:         json["data"] as? [String: Any] ?? [:],
         targetScreen: json["target_screen"] as? String,
         display:      display,
-        action:       action
+        action:       action,
+        force:        json["force"] as? Bool ?? false
     )
 }

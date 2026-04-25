@@ -198,6 +198,9 @@ public final class AppInsight {
         guard !matches.isEmpty else { return }
         cachedInsights.removeAll { $0.targetScreen == nil || $0.targetScreen == screen }
         for insight in matches {
+            if insight.force {
+                UserDefaults.standard.removeObject(forKey: "insight_optout_\(insight.id)")
+            }
             guard !isOptedOut(insightId: insight.id) else { continue }
             AppInsightLogger.info("Showing cached insight \(insight.id) — screen: '\(screen)'")
             presenter.present(insight, onAction: onInsightAction)
@@ -281,6 +284,9 @@ extension AppInsight: WebSocketManagerDelegate {
             AppInsightLogger.info("pending_insights received — count: \(list.count)")
             DispatchQueue.main.async {
                 for insight in list {
+                    if insight.force {
+                        UserDefaults.standard.removeObject(forKey: "insight_optout_\(insight.id)")
+                    }
                     guard !self.isOptedOut(insightId: insight.id) else { continue }
                     if let target = insight.targetScreen, target != self.currentScreen {
                         AppInsightLogger.info("pending insight CACHED — waiting for '\(target)' (current: '\(self.currentScreen ?? "nil")')")
@@ -297,6 +303,9 @@ extension AppInsight: WebSocketManagerDelegate {
             AppInsightLogger.debug("insight_push detail — targetScreen: \(insight.targetScreen ?? "none"), display: \(insight.display?.style ?? "banner"), duration: \(insight.display?.durationMs.map { "\($0)ms" } ?? "nil")")
             DispatchQueue.main.async {
                 AppInsightLogger.debug("insight_push on main thread — currentScreen: \(self.currentScreen ?? "nil")")
+                if insight.force {
+                    UserDefaults.standard.removeObject(forKey: "insight_optout_\(insight.id)")
+                }
                 if self.isOptedOut(insightId: insight.id) {
                     AppInsightLogger.info("insight_push DISCARDED — opted out: \(insight.id)")
                     return
