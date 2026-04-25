@@ -31,8 +31,10 @@ final class WebSocketManager: NSObject {
 
         let config = URLSessionConfiguration.default
         config.waitsForConnectivity = false  // sunucu kapalıysa beklemek yerine hemen hata ver
-        config.timeoutIntervalForRequest = 10
-        config.timeoutIntervalForResource = 30
+        // timeoutIntervalForRequest: server'dan veri bekleme süresi — WebSocket için 0 (sınırsız)
+        // 10s gibi kısa değer: init_ok+config_update sonrası sunucu sessiz kalınca bağlantıyı keser
+        config.timeoutIntervalForRequest = 0
+        config.timeoutIntervalForResource = 0
         // Explicit HTTP/1.1 upgrade headers — prevents URLSessionWebSocketTask from
         // attempting HTTP/2 WebSocket (RFC 8441) which Node.js ws does not support
         config.httpAdditionalHeaders = [
@@ -43,7 +45,7 @@ final class WebSocketManager: NSObject {
         queue.maxConcurrentOperationCount = 1
         session = URLSession(configuration: config, delegate: self, delegateQueue: queue)
         var request = URLRequest(url: url)
-        request.timeoutInterval = 10
+        request.timeoutInterval = 15  // sadece ilk handshake için
         task = session?.webSocketTask(with: request)
         task?.resume()
         // listen() is called in didOpenWithProtocol — not before — to avoid
