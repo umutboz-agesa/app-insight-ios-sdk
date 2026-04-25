@@ -106,16 +106,20 @@ final class WebSocketManager: NSObject {
     // MARK: - Ping / Pong
 
     private func startPing() {
-        pingTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-            self?.task?.sendPing { error in
-                if let error { AILogger.error("Ping failed: \(error)") }
+        DispatchQueue.main.async {
+            self.pingTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+                self?.task?.sendPing { error in
+                    if let error { AILogger.error("Ping failed: \(error)") }
+                }
             }
         }
     }
 
     private func stopPing() {
-        pingTimer?.invalidate()
-        pingTimer = nil
+        DispatchQueue.main.async {
+            self.pingTimer?.invalidate()
+            self.pingTimer = nil
+        }
     }
 
     // MARK: - Reconnect
@@ -166,5 +170,13 @@ extension WebSocketManager: URLSessionWebSocketDelegate {
     ) {
         AILogger.info("WS closed: \(closeCode.rawValue)")
         handleDisconnect()
+    }
+
+    // Called when connection attempt fails (backend down, timeout, etc.)
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if let error {
+            AILogger.error("WS task failed: \(error.localizedDescription)")
+            handleDisconnect()
+        }
     }
 }
