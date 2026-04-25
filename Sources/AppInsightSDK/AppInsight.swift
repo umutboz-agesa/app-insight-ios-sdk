@@ -319,6 +319,16 @@ extension AppInsight: WebSocketManagerDelegate {
                 self.presenter.present(insight, onAction: self.onInsightAction)
             }
 
+        case .forceClearOptout(let insightIds):
+            AppInsightLogger.info("force_clear_optout — \(insightIds.count) insight(s) cleared")
+            for id in insightIds {
+                UserDefaults.standard.removeObject(forKey: "insight_optout_\(id)")
+            }
+            // Also remove any cached insights for these IDs so they can be re-shown
+            DispatchQueue.main.async {
+                self.cachedInsights.removeAll { insightIds.contains($0.id) }
+            }
+
         case .dataPush(let event, let data):
             AppInsightLogger.info("data_push: \(event)")
             onDataPush?(event, data)

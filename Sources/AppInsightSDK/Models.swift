@@ -138,6 +138,7 @@ enum InboundMessage {
     case configUpdate(config: [String: Any], screens: [[String: Any]])
     case insightPush(InsightMessage)
     case pendingInsights([InsightMessage])
+    case forceClearOptout(insightIds: [String])
     case dataPush(event: String, data: [String: Any])
     case unknown
 }
@@ -171,6 +172,10 @@ extension InboundMessage {
         case "pending_insights":
             let list = json["insights"] as? [[String: Any]] ?? []
             return .pendingInsights(list.map { parseInsight(from: $0) })
+
+        case "force_clear_optout":
+            let ids = json["insight_ids"] as? [String] ?? []
+            return .forceClearOptout(insightIds: ids)
 
         case "data_push":
             let event = json["event"] as? String ?? ""
