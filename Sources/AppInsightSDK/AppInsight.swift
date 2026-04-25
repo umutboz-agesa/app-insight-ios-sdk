@@ -43,6 +43,9 @@ public final class AppInsight {
     private var currentScreen: String? = nil
     private var dwellTimers: [String: [DispatchWorkItem]] = [:]
 
+    // Insights waiting for the right screen (main thread only)
+    private var cachedInsights: [InsightMessage] = []
+
     /// SDK'nın dwell event göndereceği süreler (ms). Default: 3s, 10s, 30s, 60s.
     /// Örn: `AppInsight.shared.dwellThresholds = [5_000, 15_000]`
     public var dwellThresholds: [Int] = [3_000, 10_000, 30_000, 60_000]
@@ -111,6 +114,7 @@ public final class AppInsight {
     /// Ekran görünür olduğunda çağrılır. (Main thread)
     public func screenDidAppear(_ name: String) {
         currentScreen = name
+        showCachedInsights(for: name)
         scheduleDwellTimers(for: name)
         let ts = tracker.appeared(name)
         enqueue(.screenEvent(ScreenEventPayload(
@@ -187,6 +191,19 @@ public final class AppInsight {
         )))
     }
 
+    // Shows all cached insights whose targetScreen matches the given screen (or have no targetScreen).
+    // Must be called on main thread.
+    private func showCachedInsights(for screen: String) {
+        let matches = cachedInsights.filter { $0.targetScreen == nil || $0.targetScreen == screen }
+        guard !matches.isEmpty else { return }
+        cachedInsights.removeAll { $0.targetScreen == nil || $0.targetScreen == screen }
+        for insight in matches {
+            guard !isOptedOut(insightId: insight.id) else { continue }
+            AppInsightLogger.info("Showing cached insight \(insight.id) — screen: '\(screen)'")
+            presenter.present(insight, onAction: onInsightAction)
+        }
+    }
+
     private func flushPending() {
         lock.lock()
         let events = pendingEvents
@@ -260,6 +277,21 @@ extension AppInsight: WebSocketManagerDelegate {
         case .configUpdate(_, let screens):
             AppInsightLogger.info("config_update — \(screens.count) screens")
 
+        case .pendingInsights(let list):
+            AppInsightLogger.info("pending_insights received — count: \(list.count)")
+            DispatchQueue.main.async {
+                for insight in list {
+                    guard !self.isOptedOut(insightId: insight.id) else { continue }
+                    if let target = insight.targetScreen, target != self.currentScreen {
+                        AppInsightLogger.info("pending insight CACHED — waiting for '\(target)' (current: '\(self.currentScreen ?? "nil")')")
+                        self.cachedInsights.append(insight)
+                    } else {
+                        AppInsightLogger.info("pending insight → showing immediately (no targetScreen or already on screen)")
+                        self.presenter.present(insight, onAction: self.onInsightAction)
+                    }
+                }
+            }
+
         case .insightPush(let insight):
             AppInsightLogger.info("insight_push RECEIVED — id: \(insight.id), title: \(insight.title)")
             AppInsightLogger.debug("insight_push detail — targetScreen: \(insight.targetScreen ?? "none"), display: \(insight.display?.style ?? "banner"), duration: \(insight.display?.durationMs.map { "\($0)ms" } ?? "nil")")
@@ -270,7 +302,8 @@ extension AppInsight: WebSocketManagerDelegate {
                     return
                 }
                 if let target = insight.targetScreen, target != self.currentScreen {
-                    AppInsightLogger.info("insight_push DISCARDED — target '\(target)' ≠ current '\(self.currentScreen ?? "nil")'")
+                    AppInsightLogger.info("insight_push CACHED — waiting for '\(target)' (current: '\(self.currentScreen ?? "nil")')")
+                    self.cachedInsights.append(insight)
                     return
                 }
                 AppInsightLogger.info("insight_push → calling presenter.present()")

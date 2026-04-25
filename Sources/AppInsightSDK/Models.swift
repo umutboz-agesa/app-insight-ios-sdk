@@ -135,6 +135,7 @@ enum InboundMessage {
     case initError(code: String, message: String)
     case configUpdate(config: [String: Any], screens: [[String: Any]])
     case insightPush(InsightMessage)
+    case pendingInsights([InsightMessage])
     case dataPush(event: String, data: [String: Any])
     case unknown
 }
@@ -163,30 +164,11 @@ extension InboundMessage {
             return .configUpdate(config: config, screens: screens)
 
         case "insight_push":
-            let display: InsightDisplay? = {
-                guard let d = json["display"] as? [String: Any] else { return nil }
-                return InsightDisplay(
-                    style: d["style"] as? String ?? "banner",
-                    durationMs: d["duration_ms"] as? Int
-                )
-            }()
-            let action: InsightAction? = {
-                guard let a = json["action"] as? [String: Any] else { return nil }
-                return InsightAction(
-                    type: a["type"] as? String ?? "dismiss",
-                    url: a["url"] as? String
-                )
-            }()
-            let insight = InsightMessage(
-                id:           json["insight_id"] as? String ?? "",
-                title:        json["title"] as? String ?? "",
-                body:         json["body"] as? String,
-                data:         json["data"] as? [String: Any] ?? [:],
-                targetScreen: json["target_screen"] as? String,
-                display:      display,
-                action:       action
-            )
-            return .insightPush(insight)
+            return .insightPush(parseInsight(from: json))
+
+        case "pending_insights":
+            let list = json["insights"] as? [[String: Any]] ?? []
+            return .pendingInsights(list.map { parseInsight(from: $0) })
 
         case "data_push":
             let event = json["event"] as? String ?? ""
@@ -197,4 +179,30 @@ extension InboundMessage {
             return .unknown
         }
     }
+}
+
+private func parseInsight(from json: [String: Any]) -> InsightMessage {
+    let display: InsightDisplay? = {
+        guard let d = json["display"] as? [String: Any] else { return nil }
+        return InsightDisplay(
+            style: d["style"] as? String ?? "banner",
+            durationMs: d["duration_ms"] as? Int
+        )
+    }()
+    let action: InsightAction? = {
+        guard let a = json["action"] as? [String: Any] else { return nil }
+        return InsightAction(
+            type: a["type"] as? String ?? "dismiss",
+            url: a["url"] as? String
+        )
+    }()
+    return InsightMessage(
+        id:           json["insight_id"] as? String ?? "",
+        title:        json["title"] as? String ?? "",
+        body:         json["body"] as? String,
+        data:         json["data"] as? [String: Any] ?? [:],
+        targetScreen: json["target_screen"] as? String,
+        display:      display,
+        action:       action
+    )
 }
