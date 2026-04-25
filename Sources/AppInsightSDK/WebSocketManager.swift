@@ -26,6 +26,7 @@ final class WebSocketManager: NSObject {
     // MARK: - Connect / Disconnect
 
     func connect() {
+        AppInsightLogger.info("WS connecting to \(url)")
         isIntentionalClose = false
         teardown()  // her zaman temiz başla
 
@@ -71,7 +72,7 @@ final class WebSocketManager: NSObject {
         guard let data = message.toJSON() else { return }
         let wsMessage = URLSessionWebSocketTask.Message.data(data)
         task?.send(wsMessage) { error in
-            if let error { AILogger.error("WS send failed: \(error)") }
+            if let error { AppInsightLogger.error("WS send failed: \(error)") }
         }
     }
 
@@ -88,7 +89,7 @@ final class WebSocketManager: NSObject {
                 self.handleRaw(message)
                 self.listen()
             case .failure(let error):
-                AILogger.error("WS receive error: \(error)")
+                AppInsightLogger.error("WS receive error: \(error)")
                 self.handleDisconnect()
             }
         }
@@ -114,7 +115,7 @@ final class WebSocketManager: NSObject {
         DispatchQueue.main.async {
             self.pingTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
                 self?.task?.sendPing { error in
-                    if let error { AILogger.error("Ping failed: \(error)") }
+                    if let error { AppInsightLogger.error("Ping failed: \(error)") }
                 }
             }
         }
@@ -144,7 +145,7 @@ final class WebSocketManager: NSObject {
             delay = 60.0
         }
 
-        AILogger.info("Reconnecting in \(Int(delay))s (attempt \(reconnectAttempts))")
+        AppInsightLogger.info("Reconnecting in \(Int(delay))s (attempt \(reconnectAttempts))")
         DispatchQueue.global().asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self, !self.isIntentionalClose else { return }
             self.connect()
@@ -160,8 +161,11 @@ extension WebSocketManager: URLSessionWebSocketDelegate {
         webSocketTask: URLSessionWebSocketTask,
         didOpenWithProtocol protocol: String?
     ) {
-        guard session === self.session else { return }
-        AILogger.info("WS connected")
+        guard session === self.session else {
+            AppInsightLogger.debug("WS didOpen — ignoring stale session")
+            return
+        }
+        AppInsightLogger.info("WS connected ✓")
         reconnectAttempts = 0
         startPing()
         listen()
@@ -175,7 +179,7 @@ extension WebSocketManager: URLSessionWebSocketDelegate {
         reason: Data?
     ) {
         guard session === self.session else { return }
-        AILogger.info("WS closed: \(closeCode.rawValue)")
+        AppInsightLogger.info("WS closed: \(closeCode.rawValue)")
         handleDisconnect()
     }
 
@@ -183,9 +187,12 @@ extension WebSocketManager: URLSessionWebSocketDelegate {
     // Guard against stale sessions: teardown() invalidates the old session asynchronously,
     // so its didCompleteWithError fires after the new session is active — must be ignored.
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        guard session === self.session else { return }
+        guard session === self.session else {
+            AppInsightLogger.debug("WS didComplete — ignoring stale session")
+            return
+        }
         if let error {
-            AILogger.error("WS task failed: \(error.localizedDescription)")
+            AppInsightLogger.error("WS task failed: \(error.localizedDescription)")
             handleDisconnect()
         }
     }

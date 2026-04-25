@@ -15,8 +15,12 @@ public final class DefaultInsightPresenter: InsightPresenting {
     public init() {}
 
     public func present(_ insight: InsightMessage, onAction: ((InsightMessage) -> Void)?) {
-        guard let window = keyWindow() else { return }
-
+        AppInsightLogger.debug("DefaultInsightPresenter.present() — style: \(insight.display?.style ?? "banner")")
+        guard let window = keyWindow() else {
+            AppInsightLogger.error("DefaultInsightPresenter: keyWindow is nil — banner cannot be shown")
+            return
+        }
+        AppInsightLogger.debug("keyWindow found: \(window)")
         switch insight.display?.style ?? "banner" {
         case "modal": presentModal(insight, in: window, onAction: onAction)
         case "toast":  presentToast(insight, in: window)

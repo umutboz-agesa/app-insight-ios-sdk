@@ -157,23 +157,27 @@ public final class InsightBannerView: UIView {
     public override func didMoveToSuperview() {
         super.didMoveToSuperview()
         if superview != nil {
+            AppInsightLogger.info("InsightBannerView added to window — starting countdown (\(remainingSeconds)s)")
             startCountdown()
-            startProgressBar()
         } else {
+            AppInsightLogger.debug("InsightBannerView removed from superview")
             stopCountdown()
         }
     }
 
-    // MARK: - Countdown (Timer, saniyede bir)
+    // MARK: - Countdown + progress (Timer, saniyede bir)
 
     private func startCountdown() {
         countdownTimer?.invalidate()
+        let totalSeconds = Float(durationMs) / 1000
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.remainingSeconds -= 1
             let s = max(0, self.remainingSeconds)
             self.countdownLabel.text = "\(s)s"
             if s <= 2 { self.countdownLabel.textColor = .systemOrange }
+            // UIProgressView.setProgress(animated:true) kendi 0.25s animasyonu ile günceller
+            self.progressView.setProgress(Float(s) / totalSeconds, animated: true)
             if s == 0 { self.countdownTimer?.invalidate() }
         }
     }
@@ -181,22 +185,6 @@ public final class InsightBannerView: UIView {
     private func stopCountdown() {
         countdownTimer?.invalidate()
         countdownTimer = nil
-    }
-
-    // MARK: - Progress bar animation (UIView.animate + UIProgressView)
-
-    private func startProgressBar() {
-        // Bir run loop sonra başlat — view henüz layout almamış olabilir
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            UIView.animate(
-                withDuration: Double(self.durationMs) / 1000,
-                delay: 0,
-                options: .curveLinear
-            ) {
-                self.progressView.setProgress(0, animated: false)
-            }
-        }
     }
 
     // MARK: - Button handlers

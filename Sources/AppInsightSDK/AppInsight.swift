@@ -21,6 +21,11 @@ public final class AppInsight {
     /// Bir data push alındığında çağrılır (main thread).
     public var onDataPush: ((_ event: String, _ data: [String: Any]) -> Void)?
 
+    /// true yapınca tüm WS ve banner adımları konsola yazılır.
+    public var isDebug: Bool = false {
+        didSet { AppInsightLogger.isDebug = isDebug }
+    }
+
     // MARK: - Private state
 
     private var wsManager: WebSocketManager?
@@ -55,7 +60,7 @@ public final class AppInsight {
         self.sessionId   = UUID().uuidString
         self.pendingEvents = []
 
-        AILogger.info("AppInsight initializing — env: \(environment), session: \(sessionId)")
+        AppInsightLogger.info("AppInsight initializing — env: \(environment), session: \(sessionId), debug: \(isDebug)")
 
         let manager = WebSocketManager(url: environment.wsURL)
         manager.delegate = self
@@ -69,7 +74,7 @@ public final class AppInsight {
         wsManager = nil
         isInitialized = false
         pendingEvents = []
-        AILogger.info("AppInsight disconnected")
+        AppInsightLogger.info("AppInsight disconnected")
     }
 
     // MARK: - Opt-out (permanent dismiss)
@@ -78,7 +83,7 @@ public final class AppInsight {
     /// `InsightBannerView` / `InsightModalView` içinden otomatik çağrılır.
     public func permanentlyDismiss(insightId: String) {
         UserDefaults.standard.set(true, forKey: "insight_optout_\(insightId)")
-        AILogger.info("insight optout (local) — \(insightId)")
+        AppInsightLogger.info("insight optout (local) — \(insightId)")
         enqueue(.insightOptout(InsightOptoutPayload(
             apiKey:    apiKey,
             deviceId:  deviceId,
@@ -88,7 +93,7 @@ public final class AppInsight {
 
     /// Kullanıcı aksiyonunu sunucuya bildirir (auto_closed, user_closed, action_clicked).
     func recordAction(insightId: String, action: String) {
-        AILogger.info("insight_action — \(action): \(insightId)")
+        AppInsightLogger.info("insight_action — \(action): \(insightId)")
         enqueue(.insightAction(InsightActionPayload(
             apiKey:    apiKey,
             deviceId:  deviceId,
@@ -170,7 +175,7 @@ public final class AppInsight {
 
     private func sendDwellEvent(screen: String, durationMs: Int) {
         let ts = Int64(Date().timeIntervalSince1970 * 1000)
-        AILogger.info("dwell — \(screen), \(durationMs / 1000)s")
+        AppInsightLogger.info("dwell — \(screen), \(durationMs / 1000)s")
         enqueue(.screenEvent(ScreenEventPayload(
             apiKey:     apiKey,
             deviceId:   deviceId,
@@ -189,7 +194,7 @@ public final class AppInsight {
         lock.unlock()
 
         guard !events.isEmpty else { return }
-        AILogger.info("Flushing \(events.count) buffered events")
+        AppInsightLogger.info("Flushing \(events.count) buffered events")
         events.forEach { wsManager?.send($0) }
     }
 
@@ -199,7 +204,7 @@ public final class AppInsight {
         let osVersion  = UIDevice.current.systemVersion
         let model      = Self.deviceModel()
 
-        AILogger.info("sdk_init — bundle: \(bundleId), version: \(appVersion), os: \(osVersion), model: \(model)")
+        AppInsightLogger.info("sdk_init — bundle: \(bundleId), version: \(appVersion), os: \(osVersion), model: \(model)")
 
         wsManager?.send(.sdkInit(SdkInitPayload(
             apiKey:     apiKey,
@@ -229,7 +234,7 @@ public final class AppInsight {
 extension AppInsight: WebSocketManagerDelegate {
 
     func webSocketDidConnect() {
-        AILogger.info("WS connected → sending sdk_init")
+        AppInsightLogger.info("WS connected → sending sdk_init")
         sendInit()
     }
 
@@ -241,36 +246,39 @@ extension AppInsight: WebSocketManagerDelegate {
         switch message {
 
         case .initOk(let appId, let sessionId):
-            AILogger.info("init_ok — app: \(appId), session: \(sessionId)")
+            AppInsightLogger.info("init_ok — app: \(appId), session: \(sessionId)")
             isInitialized = true
             flushPending()
 
         case .initError(let code, let msg):
-            AILogger.error("init_error [\(code)]: \(msg) — tracking disabled")
+            AppInsightLogger.error("init_error [\(code)]: \(msg) — tracking disabled")
             isInitialized = false
             pendingEvents = []
             wsManager?.disconnect()
             wsManager = nil
 
         case .configUpdate(_, let screens):
-            AILogger.info("config_update — \(screens.count) screens")
+            AppInsightLogger.info("config_update — \(screens.count) screens")
 
         case .insightPush(let insight):
-            AILogger.info("insight_push: \(insight.title)")
+            AppInsightLogger.info("insight_push RECEIVED — id: \(insight.id), title: \(insight.title)")
+            AppInsightLogger.debug("insight_push detail — targetScreen: \(insight.targetScreen ?? "none"), display: \(insight.display?.style ?? "banner"), duration: \(insight.display?.durationMs.map { "\($0)ms" } ?? "nil")")
             DispatchQueue.main.async {
+                AppInsightLogger.debug("insight_push on main thread — currentScreen: \(self.currentScreen ?? "nil")")
                 if self.isOptedOut(insightId: insight.id) {
-                    AILogger.info("insight_push discarded — opted out: \(insight.id)")
+                    AppInsightLogger.info("insight_push DISCARDED — opted out: \(insight.id)")
                     return
                 }
                 if let target = insight.targetScreen, target != self.currentScreen {
-                    AILogger.info("insight_push discarded — target '\(target)' ≠ current '\(self.currentScreen ?? "nil")'")
+                    AppInsightLogger.info("insight_push DISCARDED — target '\(target)' ≠ current '\(self.currentScreen ?? "nil")'")
                     return
                 }
+                AppInsightLogger.info("insight_push → calling presenter.present()")
                 self.presenter.present(insight, onAction: self.onInsightAction)
             }
 
         case .dataPush(let event, let data):
-            AILogger.info("data_push: \(event)")
+            AppInsightLogger.info("data_push: \(event)")
             onDataPush?(event, data)
 
         case .unknown:
