@@ -230,7 +230,15 @@ public final class DefaultInsightPresenter: InsightPresenting {
             UIView.animate(withDuration: 0.25, animations: { sheet.transform = CGAffineTransform(translationX: 0, y: sheet.bounds.height + 100) }) { _ in sheet.removeFromSuperview() }
         }
 
-        confirmBtn.addAction(UIAction { _ in hideSheet(); onConfirm() }, for: .touchUpInside)
+        confirmBtn.addAction(UIAction { _ in
+            hideSheet()
+            // Üstteki presented stack'i kapat, sonra delegate'i tetikle
+            if let rootVC = overlay.window?.rootViewController {
+                rootVC.dismiss(animated: true) { onConfirm() }
+            } else {
+                onConfirm()
+            }
+        }, for: .touchUpInside)
         cancelBtn.addAction(UIAction { _ in hideSheet() }, for: .touchUpInside)
 
         sheet.transform = CGAffineTransform(translationX: 0, y: 400)
