@@ -101,6 +101,10 @@ public final class AppInsight {
     /// Kullanıcı aksiyonunu sunucuya bildirir (auto_closed, user_closed, action_clicked).
     func recordAction(insightId: String, action: String) {
         AppInsightLogger.info("insight_action — \(action): \(insightId)")
+        if action == "action_clicked" {
+            UserDefaults.standard.set(true, forKey: "insight_optout_\(insightId)")
+            DispatchQueue.main.async { self.cachedInsights.removeAll { $0.id == insightId } }
+        }
         enqueue(.insightAction(InsightActionPayload(
             apiKey:    apiKey,
             deviceId:  deviceId,
