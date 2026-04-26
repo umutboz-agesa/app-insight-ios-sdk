@@ -100,8 +100,10 @@ public final class DefaultInsightPresenter: InsightPresenting {
             insight: insight,
             onAction: {
                 sdk.recordAction(insightId: insight.id, action: "action_clicked")
-                onAction?(insight)
-                dismiss()
+                UIView.animate(withDuration: 0.25, animations: { overlay.alpha = 0 }) { _ in
+                    overlay.removeFromSuperview()
+                    onAction?(insight)  // overlay tam kapandıktan sonra navigation
+                }
             },
             onDismiss: userClose,
             onPermanentDismiss: permanentDismiss
