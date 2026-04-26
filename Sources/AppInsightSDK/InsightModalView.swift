@@ -73,7 +73,13 @@ public final class InsightModalView: UIView {
         // — primary action button —
         if let action = insight.action, action.type != "dismiss" {
             let btn = UIButton(type: .system)
-            btn.setTitle(action.type == "deeplink" ? "Devam Et" : "Aç", for: .normal)
+            let label: String
+            switch action.type {
+            case "redirect": label = "Sayfaya Git →"
+            case "deeplink": label = "Devam Et"
+            default:         label = "Aç"
+            }
+            btn.setTitle(label, for: .normal)
             btn.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
             btn.backgroundColor = .systemIndigo
             btn.setTitleColor(.white, for: .normal)
