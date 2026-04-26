@@ -18,6 +18,10 @@ public final class AppInsight {
     /// Kullanıcı insight aksiyonuna tıkladığında çağrılır (deeplink, url routing).
     public var onInsightAction: ((InsightMessage) -> Void)?
 
+    /// `redirect` tipli insight aksiyonları için delegate.
+    /// Set edilirse banner/modal tıklandığında `appInsight(didRequestRedirectionTo:params:)` çağrılır.
+    public weak var redirectionDelegate: AppInsightRedirectionDelegate?
+
     /// Bir data push alındığında çağrılır (main thread).
     public var onDataPush: ((_ event: String, _ data: [String: Any]) -> Void)?
 
@@ -203,7 +207,29 @@ public final class AppInsight {
             }
             guard !isOptedOut(insightId: insight.id) else { continue }
             AppInsightLogger.info("Showing cached insight \(insight.id) — screen: '\(screen)'")
-            presenter.present(insight, onAction: onInsightAction)
+            presenter.present(insight, onAction: actionHandler(for: insight))
+        }
+    }
+
+    /// action.type'a göre doğru handler'ı döner.
+    /// - "redirect" → redirectionDelegate'e yönlendir (hangi ekranda olunursa olunsun)
+    /// - diğer      → onInsightAction closure'ına bırak
+    private func actionHandler(for insight: InsightMessage) -> ((InsightMessage) -> Void)? {
+        guard let action = insight.action, action.type == "redirect" else {
+            return onInsightAction
+        }
+        return { [weak self] msg in
+            guard let self else { return }
+            guard let page = msg.action?.page else {
+                AppInsightLogger.error("redirect action: pageCode missing — insight: \(msg.id)")
+                return
+            }
+            guard let delegate = self.redirectionDelegate else {
+                AppInsightLogger.error("redirect action: redirectionDelegate is nil — set AppInsight.shared.redirectionDelegate")
+                return
+            }
+            AppInsightLogger.info("redirect action → page: \(page), params: \(msg.action?.params ?? [:])")
+            delegate.appInsight(didRequestRedirectionTo: page, params: msg.action?.params ?? [:])
         }
     }
 
@@ -293,7 +319,7 @@ extension AppInsight: WebSocketManagerDelegate {
                         self.cachedInsights.append(insight)
                     } else {
                         AppInsightLogger.info("pending insight → showing immediately (no targetScreen or already on screen)")
-                        self.presenter.present(insight, onAction: self.onInsightAction)
+                        self.presenter.present(insight, onAction: self.actionHandler(for: insight))
                     }
                 }
             }
@@ -316,7 +342,7 @@ extension AppInsight: WebSocketManagerDelegate {
                     return
                 }
                 AppInsightLogger.info("insight_push → calling presenter.present()")
-                self.presenter.present(insight, onAction: self.onInsightAction)
+                self.presenter.present(insight, onAction: self.actionHandler(for: insight))
             }
 
         case .forceClearOptout(let insightIds):

@@ -20,8 +20,12 @@ public struct InsightDisplay {
 }
 
 public struct InsightAction {
-    public let type: String        // "deeplink" | "url" | "dismiss"
+    public let type: String        // "deeplink" | "url" | "dismiss" | "redirect"
     public let url: String?
+    /// Redirect aksiyonu için sayfa kodu (RedirectionPageModel raw value)
+    public let page: Int?
+    /// Redirect aksiyonu için opsiyonel parametreler (ör: contractCode, campaignId)
+    public let params: [String: Any]
 }
 
 // MARK: - Internal WS message types
@@ -199,8 +203,10 @@ private func parseInsight(from json: [String: Any]) -> InsightMessage {
     let action: InsightAction? = {
         guard let a = json["action"] as? [String: Any] else { return nil }
         return InsightAction(
-            type: a["type"] as? String ?? "dismiss",
-            url: a["url"] as? String
+            type:   a["type"] as? String ?? "dismiss",
+            url:    a["url"] as? String,
+            page:   a["page"] as? Int,
+            params: a["params"] as? [String: Any] ?? [:]
         )
     }()
     return InsightMessage(

@@ -89,10 +89,15 @@ public final class DefaultInsightPresenter: InsightPresenting {
         let dismiss = { UIView.animate(withDuration: 0.25, animations: { overlay.alpha = 0 }) { _ in overlay.removeFromSuperview() } }
         overlay.onTap = dismiss  // backdrop tap → dismiss
 
-        let permanentDismiss = { AppInsight.shared.permanentlyDismiss(insightId: insight.id) }
+        let sdk = AppInsight.shared
+        let permanentDismiss = { sdk.permanentlyDismiss(insightId: insight.id) }
         let card = InsightModalView(
             insight: insight,
-            onAction: { onAction?(insight); dismiss() },
+            onAction: {
+                sdk.recordAction(insightId: insight.id, action: "action_clicked")
+                onAction?(insight)
+                dismiss()
+            },
             onDismiss: dismiss,
             onPermanentDismiss: permanentDismiss
         )
