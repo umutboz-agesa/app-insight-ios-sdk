@@ -221,7 +221,15 @@ public final class InsightBannerView: UIView {
 
     @objc private func handleAction() {
         onAction?()
-        selfDismiss()
+        dismissSilently()  // user_closed tetikleme, sadece banner'ı kaldır
+    }
+
+    // Kullanıcı aksiyona tıkladığında — user_closed logu olmadan kapat
+    private func dismissSilently() {
+        stopCountdown()
+        UIView.animate(withDuration: 0.2, animations: { self.alpha = 0 }) { _ in
+            self.removeFromSuperview()
+        }
     }
 
     @objc private func handlePermanentDismiss() {
