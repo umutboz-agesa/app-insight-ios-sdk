@@ -90,11 +90,23 @@ public final class InsightBannerView: UIView {
         // action link
         if let action = insight.action, action.type != "dismiss" {
             let btn = UIButton(type: .system)
-            btn.setTitle(action.type == "deeplink" ? "Detayı Gör →" : "Aç →", for: .normal)
+            let label: String
+            switch action.type {
+            case "redirect": label = "Sayfaya Git →"
+            case "deeplink": label = "Detayı Gör →"
+            default:         label = "Aç →"
+            }
+            btn.setTitle(label, for: .normal)
             btn.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
             btn.contentHorizontalAlignment = .leading
             btn.addTarget(self, action: #selector(handleAction), for: .touchUpInside)
             stack.addArrangedSubview(btn)
+        }
+
+        // tüm banner kartına tap gesture — action butonuyla aynı davranış
+        if let action = insight.action, action.type != "dismiss" {
+            let tap = UITapGestureRecognizer(target: self, action: #selector(handleAction))
+            addGestureRecognizer(tap)
         }
 
         // "Bir daha gösterme"
