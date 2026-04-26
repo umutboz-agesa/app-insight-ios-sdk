@@ -99,10 +99,21 @@ public final class DefaultInsightPresenter: InsightPresenting {
         let card = InsightModalView(
             insight: insight,
             onAction: {
-                sdk.recordAction(insightId: insight.id, action: "action_clicked")
-                UIView.animate(withDuration: 0.25, animations: { overlay.alpha = 0 }) { _ in
-                    overlay.removeFromSuperview()
-                    onAction?(insight)  // overlay tam kapandıktan sonra navigation
+                let proceed = {
+                    sdk.recordAction(insightId: insight.id, action: "action_clicked")
+                    UIView.animate(withDuration: 0.25, animations: { overlay.alpha = 0 }) { _ in
+                        overlay.removeFromSuperview()
+                        onAction?(insight)
+                    }
+                }
+                if insight.action?.type == "redirect" {
+                    let topVC = Self.topmostViewController(in: window)
+                    let alert = UIAlertController(title: "Sayfadan ayrılmak istiyor musunuz?", message: nil, preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "Hayır", style: .cancel))
+                    alert.addAction(UIAlertAction(title: "Evet", style: .default) { _ in proceed() })
+                    topVC.present(alert, animated: true)
+                } else {
+                    proceed()
                 }
             },
             onDismiss: userClose,
@@ -137,6 +148,13 @@ public final class DefaultInsightPresenter: InsightPresenting {
             onAutoDismiss?()
             UIView.animate(withDuration: 0.25, animations: { view.alpha = 0 }) { _ in view.removeFromSuperview() }
         }
+    }
+
+    private static func topmostViewController(in window: UIWindow) -> UIViewController {
+        var vc = window.rootViewController ?? UIViewController()
+        while let presented = vc.presentedViewController { vc = presented }
+        if let nav = vc as? UINavigationController, let visible = nav.visibleViewController { vc = visible }
+        return vc
     }
 
     private func keyWindow() -> UIWindow? {
