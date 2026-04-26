@@ -107,11 +107,7 @@ public final class DefaultInsightPresenter: InsightPresenting {
                     }
                 }
                 if insight.action?.type == "redirect" {
-                    let topVC = Self.topmostViewController(in: window)
-                    let alert = UIAlertController(title: "Sayfadan ayrılmak istiyor musunuz?", message: nil, preferredStyle: .alert)
-                    alert.addAction(UIAlertAction(title: "Hayır", style: .cancel))
-                    alert.addAction(UIAlertAction(title: "Evet", style: .default) { _ in proceed() })
-                    topVC.present(alert, animated: true)
+                    Self.showLeaveConfirmation(in: overlay, onConfirm: proceed)
                 } else {
                     proceed()
                 }
@@ -147,6 +143,99 @@ public final class DefaultInsightPresenter: InsightPresenting {
             guard view.superview != nil else { return }  // already removed by user interaction
             onAutoDismiss?()
             UIView.animate(withDuration: 0.25, animations: { view.alpha = 0 }) { _ in view.removeFromSuperview() }
+        }
+    }
+
+    private static func showLeaveConfirmation(in overlay: UIView, onConfirm: @escaping () -> Void) {
+        let sheet = UIView()
+        sheet.backgroundColor = .systemBackground
+        sheet.layer.cornerRadius = 24
+        sheet.layer.cornerCurve = .continuous
+        sheet.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        sheet.translatesAutoresizingMaskIntoConstraints = false
+        overlay.addSubview(sheet)
+
+        NSLayoutConstraint.activate([
+            sheet.leadingAnchor.constraint(equalTo: overlay.leadingAnchor),
+            sheet.trailingAnchor.constraint(equalTo: overlay.trailingAnchor),
+            sheet.bottomAnchor.constraint(equalTo: overlay.bottomAnchor),
+        ])
+
+        let stack = UIStackView()
+        stack.axis = .vertical
+        stack.spacing = 10
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        sheet.addSubview(stack)
+
+        let handle = UIView()
+        handle.backgroundColor = UIColor.systemGray4
+        handle.layer.cornerRadius = 2.5
+        handle.translatesAutoresizingMaskIntoConstraints = false
+        handle.heightAnchor.constraint(equalToConstant: 5).isActive = true
+        handle.widthAnchor.constraint(equalToConstant: 40).isActive = true
+
+        let handleRow = UIStackView()
+        handleRow.axis = .horizontal
+        handleRow.alignment = .center
+        handleRow.distribution = .equalCentering
+        let l = UIView(); l.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let r = UIView(); r.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        handleRow.addArrangedSubview(l)
+        handleRow.addArrangedSubview(handle)
+        handleRow.addArrangedSubview(r)
+        stack.addArrangedSubview(handleRow)
+        stack.setCustomSpacing(20, after: handleRow)
+
+        let title = UILabel()
+        title.text = "Bu sayfadan ayrılıyor musunuz?"
+        title.font = .systemFont(ofSize: 17, weight: .semibold)
+        title.textAlignment = .center
+        title.numberOfLines = 0
+        stack.addArrangedSubview(title)
+
+        let subtitle = UILabel()
+        subtitle.text = "Sizi başka bir sayfaya yönlendireceğiz."
+        subtitle.font = .systemFont(ofSize: 14)
+        subtitle.textColor = .secondaryLabel
+        subtitle.textAlignment = .center
+        subtitle.numberOfLines = 0
+        stack.addArrangedSubview(subtitle)
+        stack.setCustomSpacing(24, after: subtitle)
+
+        let confirmBtn = UIButton(type: .system)
+        confirmBtn.setTitle("Evet, devam et", for: .normal)
+        confirmBtn.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
+        confirmBtn.backgroundColor = .systemIndigo
+        confirmBtn.setTitleColor(.white, for: .normal)
+        confirmBtn.layer.cornerRadius = 14
+        confirmBtn.layer.cornerCurve = .continuous
+        confirmBtn.heightAnchor.constraint(equalToConstant: 52).isActive = true
+        stack.addArrangedSubview(confirmBtn)
+
+        let cancelBtn = UIButton(type: .system)
+        cancelBtn.setTitle("Hayır, kal", for: .normal)
+        cancelBtn.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
+        cancelBtn.setTitleColor(.secondaryLabel, for: .normal)
+        cancelBtn.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        stack.addArrangedSubview(cancelBtn)
+
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: sheet.topAnchor, constant: 12),
+            stack.bottomAnchor.constraint(equalTo: sheet.safeAreaLayoutGuide.bottomAnchor, constant: -12),
+            stack.leadingAnchor.constraint(equalTo: sheet.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: sheet.trailingAnchor, constant: -24),
+        ])
+
+        let hideSheet = {
+            UIView.animate(withDuration: 0.25, animations: { sheet.transform = CGAffineTransform(translationX: 0, y: sheet.bounds.height + 100) }) { _ in sheet.removeFromSuperview() }
+        }
+
+        confirmBtn.addAction(UIAction { _ in hideSheet(); onConfirm() }, for: .touchUpInside)
+        cancelBtn.addAction(UIAction { _ in hideSheet() }, for: .touchUpInside)
+
+        sheet.transform = CGAffineTransform(translationX: 0, y: 400)
+        UIView.animate(withDuration: 0.4, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5) {
+            sheet.transform = .identity
         }
     }
 
