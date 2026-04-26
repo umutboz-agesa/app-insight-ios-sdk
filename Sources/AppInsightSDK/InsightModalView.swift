@@ -70,8 +70,10 @@ public final class InsightModalView: UIView {
 
         stack.setCustomSpacing(20, after: stack.arrangedSubviews.last ?? closeRow)
 
+        let hasAction = insight.action != nil && insight.action?.type != "dismiss"
+
         // — primary action button —
-        if let action = insight.action, action.type != "dismiss" {
+        if let action = insight.action, hasAction {
             let btn = UIButton(type: .system)
             let label: String
             switch action.type {
@@ -90,20 +92,23 @@ public final class InsightModalView: UIView {
             stack.addArrangedSubview(btn)
         }
 
-        // — kapat link —
-        let closeLink = UIButton(type: .system)
-        closeLink.setTitle("Kapat", for: .normal)
-        closeLink.setTitleColor(.tertiaryLabel, for: .normal)
-        closeLink.titleLabel?.font = .systemFont(ofSize: 14)
-        closeLink.addTarget(self, action: #selector(dismiss), for: .touchUpInside)
-        stack.addArrangedSubview(closeLink)
+        // — kapat link — sadece aksiyon yoksa göster
+        if !hasAction {
+            let closeLink = UIButton(type: .system)
+            closeLink.setTitle("Kapat", for: .normal)
+            closeLink.setTitleColor(.secondaryLabel, for: .normal)
+            closeLink.titleLabel?.font = .systemFont(ofSize: 15, weight: .medium)
+            closeLink.addTarget(self, action: #selector(dismiss), for: .touchUpInside)
+            stack.addArrangedSubview(closeLink)
+        }
 
-        // — permanent dismiss —
+        // — permanent dismiss — sola hizalı, belirgin
         if onPermanentDismiss != nil {
             let btn = UIButton(type: .system)
             btn.setTitle("Bir daha gösterme", for: .normal)
-            btn.setTitleColor(.tertiaryLabel, for: .normal)
-            btn.titleLabel?.font = .systemFont(ofSize: 12)
+            btn.setTitleColor(.systemRed.withAlphaComponent(0.7), for: .normal)
+            btn.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
+            btn.contentHorizontalAlignment = .leading
             btn.addTarget(self, action: #selector(handlePermanentDismiss), for: .touchUpInside)
             stack.addArrangedSubview(btn)
         }
