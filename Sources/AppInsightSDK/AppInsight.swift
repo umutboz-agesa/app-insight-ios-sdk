@@ -25,11 +25,6 @@ public final class AppInsight {
     /// Bir data push alındığında çağrılır (main thread).
     public var onDataPush: ((_ event: String, _ data: [String: Any]) -> Void)?
 
-    /// `return_to` tipli insight aksiyonu için çağrılır.
-    /// `screenName` hedef VC class adı — navigation stack'te o ekrana pop et.
-    /// Örn: navigationController?.popToViewController(where: screenName)
-    public var onReturnToScreen: ((_ screenName: String) -> Void)?
-
     /// true yapınca tüm WS ve banner adımları konsola yazılır.
     public var isDebug: Bool = false {
         didSet { AppInsightLogger.isDebug = isDebug }
@@ -242,20 +237,13 @@ public final class AppInsight {
                 delegate.appInsight(didRequestRedirectionTo: page, params: msg.action?.params ?? [:])
             }
         case "return_to":
-            return { [weak self] msg in
-                guard let self else { return }
+            return { msg in
                 guard let screen = msg.action?.screen, !screen.isEmpty else {
                     AppInsightLogger.error("return_to action: screen missing — insight: \(msg.id)")
                     return
                 }
                 AppInsightLogger.info("return_to action → screen: \(screen)")
-                DispatchQueue.main.async {
-                    if let handler = self.onReturnToScreen {
-                        handler(screen)
-                    } else {
-                        AppInsightLogger.error("return_to action: onReturnToScreen is nil — set AppInsight.shared.onReturnToScreen")
-                    }
-                }
+                DispatchQueue.main.async { Self.popToScreen(named: screen) }
             }
         default:
             return onInsightAction
@@ -291,6 +279,40 @@ public final class AppInsight {
             osVersion:  osVersion,
             model:      model
         )))
+    }
+
+    // Aktif navigation controller'ı bulup hedef ekrana pop eder.
+    // UINavigationController → direkt; TabBar → seçili tab'ın nav'ı; Presented → presented içinde arar.
+    private static func popToScreen(named screenName: String) {
+        guard let window = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .flatMap({ $0.windows })
+            .first(where: { $0.isKeyWindow }),
+              let root = window.rootViewController else {
+            AppInsightLogger.error("return_to: keyWindow/rootVC bulunamadı")
+            return
+        }
+
+        func findNav(_ vc: UIViewController) -> UINavigationController? {
+            if let nav = vc as? UINavigationController { return nav }
+            if let tab = vc as? UITabBarController,
+               let selected = tab.selectedViewController { return findNav(selected) }
+            if let presented = vc.presentedViewController { return findNav(presented) }
+            return vc.children.compactMap { findNav($0) }.first
+        }
+
+        guard let nav = findNav(root) else {
+            AppInsightLogger.error("return_to: UINavigationController bulunamadı")
+            return
+        }
+        guard let target = nav.viewControllers.first(where: {
+            String(describing: type(of: $0)) == screenName
+        }) else {
+            AppInsightLogger.error("return_to: '\(screenName)' stack'te yok — pop yapılamadı")
+            return
+        }
+        AppInsightLogger.info("return_to: popToViewController → \(screenName)")
+        nav.popToViewController(target, animated: true)
     }
 
     private static func deviceModel() -> String {
