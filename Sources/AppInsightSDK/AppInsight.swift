@@ -50,9 +50,16 @@ public final class AppInsight {
     // Insights waiting for the right screen (main thread only)
     private var cachedInsights: [InsightMessage] = []
 
+    // key → (UITextField weak ref, screen name) — main thread only
+    private var registeredInputs: [String: InputEntry] = [:]
+
     /// SDK'nın dwell event göndereceği süreler (ms). Default: 3s, 10s, 30s, 60s.
     /// Örn: `AppInsight.shared.dwellThresholds = [5_000, 15_000]`
     public var dwellThresholds: [Int] = [3_000, 10_000, 30_000, 60_000]
+
+    /// UI element kayıt namespace'i.
+    /// `AppInsight.shared.member.setInput(field, key: "key")`
+    public lazy var member: AppInsightMemberRegistry = AppInsightMemberRegistry(sdk: self)
 
     // MARK: - Initialize
 
@@ -245,9 +252,82 @@ public final class AppInsight {
                 AppInsightLogger.info("return_to action → screen: \(screen)")
                 DispatchQueue.main.async { Self.popToScreen(named: screen) }
             }
+        case "set_value":
+            return { [weak self] msg in
+                guard let self else { return }
+                guard let memberKey = msg.action?.memberKey, !memberKey.isEmpty else {
+                    AppInsightLogger.error("set_value action: memberKey missing — insight: \(msg.id)")
+                    return
+                }
+                let suggested = msg.action?.suggestedValue ?? ""
+                AppInsightLogger.info("set_value action → key: \(memberKey), mode: \(suggested.isEmpty ? "input_sheet" : "direct_apply"), value: \(suggested)")
+                DispatchQueue.main.async {
+                    if !suggested.isEmpty {
+                        // "Öneri Uygula" modu: portal değeri sabit, ekrana gidip direkt set et
+                        self._applySetValueNavigating(key: memberKey, value: suggested)
+                    } else {
+                        // "Değer Gir" modu: kullanıcı değeri input sheet'te girer, sonra ekrana gidip set et
+                        guard let window = UIApplication.shared.connectedScenes
+                            .compactMap({ $0 as? UIWindowScene })
+                            .flatMap({ $0.windows })
+                            .first(where: { $0.isKeyWindow }) else { return }
+                        InsightInputSheet.present(in: window, insight: msg, memberKey: memberKey, suggestedValue: "") { value in
+                            self._applySetValueNavigating(key: memberKey, value: value)
+                        }
+                    }
+                }
+            }
         default:
             return onInsightAction
         }
+    }
+
+    // MARK: - Member internals (called by AppInsightMemberRegistry)
+
+    func _registerInput(_ textField: UITextField, key: String, screen: String) {
+        DispatchQueue.main.async { self.registeredInputs[key] = InputEntry(textField: textField, screen: screen) }
+        AppInsightLogger.info("member_register — key: \(key), screen: \(screen)")
+        enqueue(.memberRegister(MemberRegisterPayload(
+            apiKey:      apiKey,
+            deviceId:    deviceId,
+            key:         key,
+            elementType: "input",
+            screen:      screen,
+            platform:    "ios"
+        )))
+    }
+
+    func _applySetValue(key: String, value: String) {
+        guard let entry = registeredInputs[key], let field = entry.textField else {
+            AppInsightLogger.error("set_value: '\(key)' için kayıtlı input bulunamadı veya serbest bırakıldı")
+            return
+        }
+        field.text = value
+        field.sendActions(for: .editingChanged)
+        AppInsightLogger.info("set_value applied — key: \(key), value: \(value)")
+    }
+
+    /// Gerekirse önce ekrana pop eder, ardından değeri set eder. Main thread'den çağrılmalı.
+    func _applySetValueNavigating(key: String, value: String) {
+        let registeredScreen = registeredInputs[key]?.screen ?? ""
+        let isOnScreen = registeredScreen.isEmpty || registeredScreen == currentScreen
+        if isOnScreen {
+            _applySetValue(key: key, value: value)
+        } else {
+            AppInsightLogger.info("set_value: '\(registeredScreen)' ekranına pop ediliyor → ardından set")
+            Self.popToScreen(named: registeredScreen) { [weak self] in
+                self?._applySetValue(key: key, value: value)
+            }
+        }
+    }
+
+    func _deriveScreenName(from view: UIView) -> String {
+        var responder: UIResponder? = view.next
+        while let r = responder {
+            if let vc = r as? UIViewController { return String(describing: type(of: vc)) }
+            responder = r.next
+        }
+        return currentScreen ?? "unknown"
     }
 
     private func flushPending() {
@@ -283,7 +363,7 @@ public final class AppInsight {
 
     // Aktif navigation controller'ı bulup hedef ekrana pop eder.
     // UINavigationController → direkt; TabBar → seçili tab'ın nav'ı; Presented → presented içinde arar.
-    private static func popToScreen(named screenName: String) {
+    private static func popToScreen(named screenName: String, completion: (() -> Void)? = nil) {
         guard let window = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
             .flatMap({ $0.windows })
@@ -313,6 +393,11 @@ public final class AppInsight {
         }
         AppInsightLogger.info("return_to: popToViewController → \(screenName)")
         nav.popToViewController(target, animated: true)
+        if let coordinator = nav.transitionCoordinator {
+            coordinator.animate(alongsideTransition: nil) { _ in completion?() }
+        } else {
+            completion?()
+        }
     }
 
     private static func deviceModel() -> String {
@@ -416,4 +501,11 @@ extension AppInsight: WebSocketManagerDelegate {
             break
         }
     }
+}
+
+// MARK: - InputEntry (weak ref wrapper)
+
+private struct InputEntry {
+    weak var textField: UITextField?
+    let screen: String
 }

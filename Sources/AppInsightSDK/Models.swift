@@ -20,12 +20,16 @@ public struct InsightDisplay {
 }
 
 public struct InsightAction {
-    public let type: String        // "deeplink" | "url" | "dismiss" | "redirect" | "return_to"
+    public let type: String        // "deeplink" | "url" | "dismiss" | "redirect" | "return_to" | "set_value"
     public let url: String?
     /// Redirect aksiyonu için sayfa kodu (RedirectionPageModel raw value)
     public let page: Int?
     /// return_to aksiyonu için hedef ekran adı (VC class name)
     public let screen: String?
+    /// set_value aksiyonu için SDK üye anahtarı (setInput ile register edilen key)
+    public let memberKey: String?   // JSON key: "member_key"
+    /// set_value aksiyonu için önerilen değer (input alanına pre-fill edilir)
+    public let suggestedValue: String?  // JSON key: "suggested_value"
     /// Redirect aksiyonu için opsiyonel parametreler (ör: contractCode, campaignId)
     public let params: [String: Any]
 }
@@ -37,13 +41,15 @@ enum OutboundMessage {
     case screenEvent(ScreenEventPayload)
     case insightOptout(InsightOptoutPayload)
     case insightAction(InsightActionPayload)
+    case memberRegister(MemberRegisterPayload)
 
     func toJSON() -> Data? {
         switch self {
-        case .sdkInit(let p):        return try? JSONSerialization.data(withJSONObject: p.dict)
-        case .screenEvent(let p):    return try? JSONSerialization.data(withJSONObject: p.dict)
-        case .insightOptout(let p):  return try? JSONSerialization.data(withJSONObject: p.dict)
-        case .insightAction(let p):  return try? JSONSerialization.data(withJSONObject: p.dict)
+        case .sdkInit(let p):         return try? JSONSerialization.data(withJSONObject: p.dict)
+        case .screenEvent(let p):     return try? JSONSerialization.data(withJSONObject: p.dict)
+        case .insightOptout(let p):   return try? JSONSerialization.data(withJSONObject: p.dict)
+        case .insightAction(let p):   return try? JSONSerialization.data(withJSONObject: p.dict)
+        case .memberRegister(let p):  return try? JSONSerialization.data(withJSONObject: p.dict)
         }
     }
 }
@@ -136,6 +142,27 @@ struct InsightActionPayload {
     }
 }
 
+struct MemberRegisterPayload {
+    let apiKey: String
+    let deviceId: String
+    let key: String
+    let elementType: String
+    let screen: String
+    let platform: String
+
+    var dict: [String: Any] {
+        [
+            "type":         "member_register",
+            "api_key":      apiKey,
+            "device_id":    deviceId,
+            "key":          key,
+            "element_type": elementType,
+            "screen":       screen,
+            "platform":     platform,
+        ]
+    }
+}
+
 // MARK: - Inbound message parsing
 
 enum InboundMessage {
@@ -205,11 +232,13 @@ private func parseInsight(from json: [String: Any]) -> InsightMessage {
     let action: InsightAction? = {
         guard let a = json["action"] as? [String: Any] else { return nil }
         return InsightAction(
-            type:   a["type"] as? String ?? "dismiss",
-            url:    a["url"] as? String,
-            page:   a["page"] as? Int,
-            screen: a["screen"] as? String,
-            params: a["params"] as? [String: Any] ?? [:]
+            type:           a["type"] as? String ?? "dismiss",
+            url:            a["url"] as? String,
+            page:           a["page"] as? Int,
+            screen:         a["screen"] as? String,
+            memberKey:      a["member_key"] as? String,
+            suggestedValue: a["suggested_value"] as? String,
+            params:         a["params"] as? [String: Any] ?? [:]
         )
     }()
     return InsightMessage(

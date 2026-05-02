@@ -95,6 +95,7 @@ public final class InsightBannerView: UIView {
             case "redirect":   label = "Sayfaya Git →"
             case "deeplink":   label = "Detayı Gör →"
             case "return_to":  label = "İşleme Dön →"
+            case "set_value":  label = (action.suggestedValue?.isEmpty == false) ? "Öneri Uygula →" : "Değer Gir →"
             default:           label = "Aç →"
             }
             btn.setTitle(label, for: .normal)
