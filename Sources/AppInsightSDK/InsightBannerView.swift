@@ -92,9 +92,10 @@ public final class InsightBannerView: UIView {
             let btn = UIButton(type: .system)
             let label: String
             switch action.type {
-            case "redirect": label = "Sayfaya Git →"
-            case "deeplink": label = "Detayı Gör →"
-            default:         label = "Aç →"
+            case "redirect":   label = "Sayfaya Git →"
+            case "deeplink":   label = "Detayı Gör →"
+            case "return_to":  label = "İşleme Dön →"
+            default:           label = "Aç →"
             }
             btn.setTitle(label, for: .normal)
             btn.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)

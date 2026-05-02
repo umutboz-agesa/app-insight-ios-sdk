@@ -77,9 +77,10 @@ public final class InsightModalView: UIView {
             let btn = UIButton(type: .system)
             let label: String
             switch action.type {
-            case "redirect": label = "Sayfaya Git →"
-            case "deeplink": label = "Devam Et"
-            default:         label = "Aç"
+            case "redirect":  label = "Sayfaya Git →"
+            case "deeplink":  label = "Devam Et"
+            case "return_to": label = "İşleme Dön"
+            default:          label = "Aç"
             }
             btn.setTitle(label, for: .normal)
             btn.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
