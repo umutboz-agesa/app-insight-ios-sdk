@@ -20,10 +20,12 @@ public struct InsightDisplay {
 }
 
 public struct InsightAction {
-    public let type: String        // "deeplink" | "url" | "dismiss" | "redirect"
+    public let type: String        // "deeplink" | "url" | "dismiss" | "redirect" | "return_to"
     public let url: String?
     /// Redirect aksiyonu için sayfa kodu (RedirectionPageModel raw value)
     public let page: Int?
+    /// return_to aksiyonu için hedef ekran adı (VC class name)
+    public let screen: String?
     /// Redirect aksiyonu için opsiyonel parametreler (ör: contractCode, campaignId)
     public let params: [String: Any]
 }
@@ -206,6 +208,7 @@ private func parseInsight(from json: [String: Any]) -> InsightMessage {
             type:   a["type"] as? String ?? "dismiss",
             url:    a["url"] as? String,
             page:   a["page"] as? Int,
+            screen: a["screen"] as? String,
             params: a["params"] as? [String: Any] ?? [:]
         )
     }()

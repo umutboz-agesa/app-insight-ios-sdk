@@ -25,6 +25,11 @@ public final class AppInsight {
     /// Bir data push alındığında çağrılır (main thread).
     public var onDataPush: ((_ event: String, _ data: [String: Any]) -> Void)?
 
+    /// `return_to` tipli insight aksiyonu için çağrılır.
+    /// `screenName` hedef VC class adı — navigation stack'te o ekrana pop et.
+    /// Örn: navigationController?.popToViewController(where: screenName)
+    public var onReturnToScreen: ((_ screenName: String) -> Void)?
+
     /// true yapınca tüm WS ve banner adımları konsola yazılır.
     public var isDebug: Bool = false {
         didSet { AppInsightLogger.isDebug = isDebug }
@@ -219,21 +224,41 @@ public final class AppInsight {
     /// - "redirect" → redirectionDelegate'e yönlendir (hangi ekranda olunursa olunsun)
     /// - diğer      → onInsightAction closure'ına bırak
     private func actionHandler(for insight: InsightMessage) -> ((InsightMessage) -> Void)? {
-        guard let action = insight.action, action.type == "redirect" else {
+        guard let action = insight.action else { return onInsightAction }
+
+        switch action.type {
+        case "redirect":
+            return { [weak self] msg in
+                guard let self else { return }
+                guard let page = msg.action?.page else {
+                    AppInsightLogger.error("redirect action: pageCode missing — insight: \(msg.id)")
+                    return
+                }
+                guard let delegate = self.redirectionDelegate else {
+                    AppInsightLogger.error("redirect action: redirectionDelegate is nil — set AppInsight.shared.redirectionDelegate")
+                    return
+                }
+                AppInsightLogger.info("redirect action → page: \(page), params: \(msg.action?.params ?? [:])")
+                delegate.appInsight(didRequestRedirectionTo: page, params: msg.action?.params ?? [:])
+            }
+        case "return_to":
+            return { [weak self] msg in
+                guard let self else { return }
+                guard let screen = msg.action?.screen, !screen.isEmpty else {
+                    AppInsightLogger.error("return_to action: screen missing — insight: \(msg.id)")
+                    return
+                }
+                AppInsightLogger.info("return_to action → screen: \(screen)")
+                DispatchQueue.main.async {
+                    if let handler = self.onReturnToScreen {
+                        handler(screen)
+                    } else {
+                        AppInsightLogger.error("return_to action: onReturnToScreen is nil — set AppInsight.shared.onReturnToScreen")
+                    }
+                }
+            }
+        default:
             return onInsightAction
-        }
-        return { [weak self] msg in
-            guard let self else { return }
-            guard let page = msg.action?.page else {
-                AppInsightLogger.error("redirect action: pageCode missing — insight: \(msg.id)")
-                return
-            }
-            guard let delegate = self.redirectionDelegate else {
-                AppInsightLogger.error("redirect action: redirectionDelegate is nil — set AppInsight.shared.redirectionDelegate")
-                return
-            }
-            AppInsightLogger.info("redirect action → page: \(page), params: \(msg.action?.params ?? [:])")
-            delegate.appInsight(didRequestRedirectionTo: page, params: msg.action?.params ?? [:])
         }
     }
 
