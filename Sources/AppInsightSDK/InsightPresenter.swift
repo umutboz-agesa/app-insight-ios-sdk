@@ -35,7 +35,8 @@ public final class DefaultInsightPresenter: InsightPresenting {
         let view = InsightBannerView(
             insight: insight,
             onAction: {
-                sdk.recordAction(insightId: insight.id, action: "action_clicked")
+                let skipOptOut = insight.action?.type == "return_to"
+                sdk.recordAction(insightId: insight.id, action: "action_clicked", skipOptOut: skipOptOut)
                 onAction?(insight)
             },
             onPermanentDismiss: {
@@ -100,7 +101,8 @@ public final class DefaultInsightPresenter: InsightPresenting {
             insight: insight,
             onAction: {
                 let proceed = {
-                    sdk.recordAction(insightId: insight.id, action: "action_clicked")
+                    let skipOptOut = insight.action?.type == "return_to"
+                    sdk.recordAction(insightId: insight.id, action: "action_clicked", skipOptOut: skipOptOut)
                     UIView.animate(withDuration: 0.25, animations: { overlay.alpha = 0 }) { _ in
                         overlay.removeFromSuperview()
                         onAction?(insight)
