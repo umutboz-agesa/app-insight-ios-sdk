@@ -126,8 +126,8 @@ public final class DefaultInsightPresenter: InsightPresenting {
         ])
 
         overlay.alpha = 0
-        card.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
-        UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.75, initialSpringVelocity: 0.5) {
+        card.transform = CGAffineTransform(scaleX: 0.92, y: 0.92)
+        UIView.animate(withDuration: 0.18, delay: 0, usingSpringWithDamping: 0.85, initialSpringVelocity: 1.2) {
             overlay.alpha = 1
             card.transform = .identity
         }
@@ -138,7 +138,7 @@ public final class DefaultInsightPresenter: InsightPresenting {
     private func animate(_ view: UIView, in window: UIWindow, duration: Int, translation: CGFloat, onAutoDismiss: (() -> Void)? = nil) {
         view.alpha = 0
         view.transform = CGAffineTransform(translationX: 0, y: translation)
-        UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5) {
+        UIView.animate(withDuration: 0.18, delay: 0, usingSpringWithDamping: 0.9, initialSpringVelocity: 1.2) {
             view.alpha = 1; view.transform = .identity
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + Double(duration) / 1000) {
