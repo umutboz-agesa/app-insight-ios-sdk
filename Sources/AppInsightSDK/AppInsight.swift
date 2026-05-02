@@ -303,7 +303,10 @@ public final class AppInsight {
             return
         }
         field.text = value
+        // UIControl hedeflerini tetikle (onChange listener'ları)
         field.sendActions(for: .editingChanged)
+        // UITextFieldDelegate'i de bilgilendir — delegate bu noktada validasyon / hesaplama başlatabilir
+        field.delegate?.textFieldDidEndEditing?(field)
         AppInsightLogger.info("set_value applied — key: \(key), value: \(value)")
     }
 
