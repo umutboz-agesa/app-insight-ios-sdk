@@ -199,12 +199,12 @@ public final class AppInsight {
         )))
     }
 
-    // Shows all cached insights whose targetScreen matches the given screen (or have no targetScreen).
+    // Shows all cached insights whose targetScreens contains the given screen (or targetScreens is empty).
     // Must be called on main thread.
     private func showCachedInsights(for screen: String) {
-        let matches = cachedInsights.filter { $0.targetScreen == nil || $0.targetScreen == screen }
+        let matches = cachedInsights.filter { $0.targetScreens.isEmpty || $0.targetScreens.contains(screen) }
         guard !matches.isEmpty else { return }
-        cachedInsights.removeAll { $0.targetScreen == nil || $0.targetScreen == screen }
+        cachedInsights.removeAll { $0.targetScreens.isEmpty || $0.targetScreens.contains(screen) }
         for insight in matches {
             if insight.force {
                 UserDefaults.standard.removeObject(forKey: "insight_optout_\(insight.id)")
@@ -318,11 +318,12 @@ extension AppInsight: WebSocketManagerDelegate {
                         UserDefaults.standard.removeObject(forKey: "insight_optout_\(insight.id)")
                     }
                     guard !self.isOptedOut(insightId: insight.id) else { continue }
-                    if let target = insight.targetScreen, target != self.currentScreen {
-                        AppInsightLogger.info("pending insight CACHED — waiting for '\(target)' (current: '\(self.currentScreen ?? "nil")')")
+                    let targets = insight.targetScreens
+                    if !targets.isEmpty, let current = self.currentScreen, !targets.contains(current) {
+                        AppInsightLogger.info("pending insight CACHED — waiting for \(targets) (current: '\(current)')")
                         self.cachedInsights.append(insight)
                     } else {
-                        AppInsightLogger.info("pending insight → showing immediately (no targetScreen or already on screen)")
+                        AppInsightLogger.info("pending insight → showing immediately (no targetScreens or already on screen)")
                         self.presenter.present(insight, onAction: self.actionHandler(for: insight))
                     }
                 }
@@ -330,7 +331,7 @@ extension AppInsight: WebSocketManagerDelegate {
 
         case .insightPush(let insight):
             AppInsightLogger.info("insight_push RECEIVED — id: \(insight.id), title: \(insight.title)")
-            AppInsightLogger.debug("insight_push detail — targetScreen: \(insight.targetScreen ?? "none"), display: \(insight.display?.style ?? "banner"), duration: \(insight.display?.durationMs.map { "\($0)ms" } ?? "nil")")
+            AppInsightLogger.debug("insight_push detail — targetScreens: \(insight.targetScreens), display: \(insight.display?.style ?? "banner"), duration: \(insight.display?.durationMs.map { "\($0)ms" } ?? "nil")")
             DispatchQueue.main.async {
                 AppInsightLogger.debug("insight_push on main thread — currentScreen: \(self.currentScreen ?? "nil")")
                 if insight.force {
@@ -340,8 +341,9 @@ extension AppInsight: WebSocketManagerDelegate {
                     AppInsightLogger.info("insight_push DISCARDED — opted out: \(insight.id)")
                     return
                 }
-                if let target = insight.targetScreen, target != self.currentScreen {
-                    AppInsightLogger.info("insight_push CACHED — waiting for '\(target)' (current: '\(self.currentScreen ?? "nil")')")
+                let targets = insight.targetScreens
+                if !targets.isEmpty, let current = self.currentScreen, !targets.contains(current) {
+                    AppInsightLogger.info("insight_push CACHED — waiting for \(targets) (current: '\(current)')")
                     self.cachedInsights.append(insight)
                     return
                 }

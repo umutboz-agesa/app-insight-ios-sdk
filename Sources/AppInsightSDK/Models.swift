@@ -7,7 +7,7 @@ public struct InsightMessage {
     public let title: String
     public let body: String?
     public let data: [String: Any]
-    public let targetScreen: String?
+    public let targetScreens: [String]
     public let display: InsightDisplay?
     public let action: InsightAction?
     /// Backend'den "opt-out'u görmezden gel, göster" talimatı
@@ -214,7 +214,9 @@ private func parseInsight(from json: [String: Any]) -> InsightMessage {
         title:        json["title"] as? String ?? "",
         body:         json["body"] as? String,
         data:         json["data"] as? [String: Any] ?? [:],
-        targetScreen: json["target_screen"] as? String,
+        targetScreens: (json["target_screens"] as? [String])
+                        ?? (json["target_screen"] as? String).map { [$0] }
+                        ?? [],
         display:      display,
         action:       action,
         force:        json["force"] as? Bool ?? false
