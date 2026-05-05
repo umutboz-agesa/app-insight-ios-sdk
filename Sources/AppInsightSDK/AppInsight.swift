@@ -43,8 +43,9 @@ public final class AppInsight {
     private var pendingEvents: [OutboundMessage] = []
     private(set) var environment: AppInsightEnvironment = .local
 
-    // Screen guard + dwell (main thread only)
-    private var currentScreen: String? = nil
+    // All currently visible screens (main thread only).
+    // Tracked as a set so overlapping child VCs don't evict the parent.
+    private var activeScreens: Set<String> = []
     private var dwellTimers: [String: [DispatchWorkItem]] = [:]
 
     // Insights waiting for the right screen (main thread only)
@@ -128,7 +129,7 @@ public final class AppInsight {
 
     /// Ekran görünür olduğunda çağrılır. (Main thread)
     public func screenDidAppear(_ name: String) {
-        currentScreen = name
+        activeScreens.insert(name)
         showCachedInsights(for: name)
         scheduleDwellTimers(for: name)
         let ts = tracker.appeared(name)
@@ -146,7 +147,7 @@ public final class AppInsight {
     /// Ekran kapandığında çağrılır. (Main thread)
     public func screenDidDisappear(_ name: String) {
         cancelDwellTimers(for: name)
-        if currentScreen == name { currentScreen = nil }
+        activeScreens.remove(name)
         guard let (ts, durationMs) = tracker.disappeared(name) else { return }
         enqueue(.screenEvent(ScreenEventPayload(
             apiKey:     apiKey,
@@ -178,7 +179,7 @@ public final class AppInsight {
         cancelDwellTimers(for: screen)
         let items: [DispatchWorkItem] = dwellThresholds.map { ms in
             let item = DispatchWorkItem { [weak self] in
-                guard let self, self.currentScreen == screen else { return }
+                guard let self, self.activeScreens.contains(screen) else { return }
                 self.sendDwellEvent(screen: screen, durationMs: ms)
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(ms), execute: item)
@@ -313,7 +314,7 @@ public final class AppInsight {
     /// Gerekirse önce ekrana pop eder, ardından değeri set eder. Main thread'den çağrılmalı.
     func _applySetValueNavigating(key: String, value: String) {
         let registeredScreen = registeredInputs[key]?.screen ?? ""
-        let isOnScreen = registeredScreen.isEmpty || registeredScreen == currentScreen
+        let isOnScreen = registeredScreen.isEmpty || activeScreens.contains(registeredScreen)
         if isOnScreen {
             _applySetValue(key: key, value: value)
         } else {
@@ -330,7 +331,7 @@ public final class AppInsight {
             if let vc = r as? UIViewController { return String(describing: type(of: vc)) }
             responder = r.next
         }
-        return currentScreen ?? "unknown"
+        return activeScreens.first ?? "unknown"
     }
 
     private func flushPending() {
@@ -454,8 +455,8 @@ extension AppInsight: WebSocketManagerDelegate {
                     }
                     guard !self.isOptedOut(insightId: insight.id) else { continue }
                     let targets = insight.targetScreens
-                    if !targets.isEmpty, let current = self.currentScreen, !targets.contains(current) {
-                        AppInsightLogger.info("pending insight CACHED — waiting for \(targets) (current: '\(current)')")
+                    if !targets.isEmpty, !targets.contains(where: { self.activeScreens.contains($0) }) {
+                        AppInsightLogger.info("pending insight CACHED — waiting for \(targets) (active: \(self.activeScreens))")
                         self.cachedInsights.append(insight)
                     } else {
                         AppInsightLogger.info("pending insight → showing immediately (no targetScreens or already on screen)")
@@ -477,8 +478,8 @@ extension AppInsight: WebSocketManagerDelegate {
                     return
                 }
                 let targets = insight.targetScreens
-                if !targets.isEmpty, let current = self.currentScreen, !targets.contains(current) {
-                    AppInsightLogger.info("insight_push CACHED — waiting for \(targets) (current: '\(current)')")
+                if !targets.isEmpty, !targets.contains(where: { self.activeScreens.contains($0) }) {
+                    AppInsightLogger.info("insight_push CACHED — waiting for \(targets) (active: \(self.activeScreens))")
                     self.cachedInsights.append(insight)
                     return
                 }

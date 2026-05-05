@@ -23,7 +23,7 @@ public final class DefaultInsightPresenter: InsightPresenting {
         AppInsightLogger.debug("keyWindow found: \(window)")
         switch insight.display?.style ?? "banner" {
         case "modal": presentModal(insight, in: window, onAction: onAction)
-        case "toast":  presentToast(insight, in: window)
+        case "toast":  presentToast(insight, in: window, onAction: onAction)
         default:       presentBanner(insight, in: window, onAction: onAction)
         }
     }
@@ -60,8 +60,19 @@ public final class DefaultInsightPresenter: InsightPresenting {
 
     // MARK: Toast
 
-    private func presentToast(_ insight: InsightMessage, in window: UIWindow) {
-        let view = InsightToastView(insight: insight)
+    private func presentToast(_ insight: InsightMessage, in window: UIWindow, onAction: ((InsightMessage) -> Void)?) {
+        let sdk = AppInsight.shared
+        let view = InsightToastView(
+            insight: insight,
+            onAction: {
+                let skipOptOut = insight.action?.type == "return_to" || insight.action?.type == "set_value"
+                sdk.recordAction(insightId: insight.id, action: "action_clicked", skipOptOut: skipOptOut)
+                onAction?(insight)
+            },
+            onUserClose: {
+                sdk.recordAction(insightId: insight.id, action: "user_closed")
+            }
+        )
         window.addSubview(view)
         view.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -70,7 +81,9 @@ public final class DefaultInsightPresenter: InsightPresenting {
             view.leadingAnchor.constraint(greaterThanOrEqualTo: window.leadingAnchor, constant: 24),
             view.trailingAnchor.constraint(lessThanOrEqualTo: window.trailingAnchor, constant: -24),
         ])
-        animate(view, in: window, duration: insight.display?.durationMs ?? 3_000, translation: 12, onAutoDismiss: nil)
+        animate(view, in: window, duration: insight.display?.durationMs ?? 3_000, translation: 12) {
+            sdk.recordAction(insightId: insight.id, action: "auto_closed")
+        }
     }
 
     // MARK: Modal
