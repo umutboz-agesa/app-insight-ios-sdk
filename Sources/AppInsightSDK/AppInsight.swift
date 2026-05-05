@@ -469,7 +469,7 @@ extension AppInsight: WebSocketManagerDelegate {
             AppInsightLogger.info("insight_push RECEIVED — id: \(insight.id), title: \(insight.title)")
             AppInsightLogger.debug("insight_push detail — targetScreens: \(insight.targetScreens), display: \(insight.display?.style ?? "banner"), duration: \(insight.display?.durationMs.map { "\($0)ms" } ?? "nil")")
             DispatchQueue.main.async {
-                AppInsightLogger.debug("insight_push on main thread — activeScreens: \(self.activeScreens)")
+                AppInsightLogger.info("insight_push on main thread — activeScreens: \(self.activeScreens)")
                 if insight.force {
                     UserDefaults.standard.removeObject(forKey: "insight_optout_\(insight.id)")
                 }
