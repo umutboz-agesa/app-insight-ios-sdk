@@ -456,8 +456,10 @@ extension AppInsight: WebSocketManagerDelegate {
                     guard !self.isOptedOut(insightId: insight.id) else { continue }
                     let targets = insight.targetScreens
                     if !targets.isEmpty, !targets.contains(where: { self.activeScreens.contains($0) }) {
-                        AppInsightLogger.info("pending insight CACHED — waiting for \(targets) (active: \(self.activeScreens))")
-                        self.cachedInsights.append(insight)
+                        if !self.cachedInsights.contains(where: { $0.id == insight.id }) {
+                            AppInsightLogger.info("pending insight CACHED — waiting for \(targets) (active: \(self.activeScreens))")
+                            self.cachedInsights.append(insight)
+                        }
                     } else {
                         AppInsightLogger.info("pending insight → showing immediately (no targetScreens or already on screen)")
                         self.presenter.present(insight, onAction: self.actionHandler(for: insight))
@@ -479,8 +481,12 @@ extension AppInsight: WebSocketManagerDelegate {
                 }
                 let targets = insight.targetScreens
                 if !targets.isEmpty, !targets.contains(where: { self.activeScreens.contains($0) }) {
-                    AppInsightLogger.info("insight_push CACHED — waiting for \(targets) (active: \(self.activeScreens))")
-                    self.cachedInsights.append(insight)
+                    if !self.cachedInsights.contains(where: { $0.id == insight.id }) {
+                        AppInsightLogger.info("insight_push CACHED — waiting for \(targets) (active: \(self.activeScreens))")
+                        self.cachedInsights.append(insight)
+                    } else {
+                        AppInsightLogger.info("insight_push SKIPPED — already cached: \(insight.id)")
+                    }
                     return
                 }
                 AppInsightLogger.info("insight_push → calling presenter.present()")
