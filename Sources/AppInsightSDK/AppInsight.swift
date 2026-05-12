@@ -236,8 +236,19 @@ public final class AppInsight {
                     AppInsightLogger.error("url action: missing or invalid url — insight: \(msg.id)")
                     return
                 }
-                AppInsightLogger.info("url action → opening: \(urlStr)")
-                DispatchQueue.main.async { UIApplication.shared.open(url) }
+                // apps.apple.com Universal Links don't resolve in Pilot/Enterprise builds —
+                // convert to itms-apps:// so the App Store app is opened directly.
+                let finalUrl: URL
+                if url.host == "apps.apple.com",
+                   var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+                    components.scheme = "itms-apps"
+                    components.host   = "itunes.apple.com"
+                    finalUrl = components.url ?? url
+                } else {
+                    finalUrl = url
+                }
+                AppInsightLogger.info("url action → opening: \(finalUrl.absoluteString)")
+                DispatchQueue.main.async { UIApplication.shared.open(finalUrl) }
             }
         case "redirect":
             return { [weak self] msg in
