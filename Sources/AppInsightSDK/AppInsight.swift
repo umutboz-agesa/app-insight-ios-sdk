@@ -245,10 +245,18 @@ public final class AppInsight {
                         UIApplication.shared.open(url, options: [.universalLinksOnly: true]) { success in
                             guard !success else { return }
                             let appIdComponent = url.pathComponents.first { $0.hasPrefix("id") && $0.dropFirst(2).allSatisfy(\.isNumber) }
-                            guard let appId = appIdComponent,
-                                  let storeUrl = URL(string: "itms-apps://itunes.apple.com/app/\(appId)") else { return }
-                            AppInsightLogger.info("url action → Universal Link failed, retrying: \(storeUrl.absoluteString)")
-                            UIApplication.shared.open(storeUrl)
+                            if let appId = appIdComponent,
+                               let storeUrl = URL(string: "itms-apps://itunes.apple.com/app/\(appId)") {
+                                AppInsightLogger.info("url action → Universal Link failed, retrying: \(storeUrl.absoluteString)")
+                                UIApplication.shared.open(storeUrl) { success in
+                                    guard !success else { return }
+                                    AppInsightLogger.info("url action → itms-apps failed, falling back to Safari: \(url.absoluteString)")
+                                    UIApplication.shared.open(url)
+                                }
+                            } else {
+                                AppInsightLogger.info("url action → falling back to Safari: \(url.absoluteString)")
+                                UIApplication.shared.open(url)
+                            }
                         }
                     } else {
                         UIApplication.shared.open(url)
