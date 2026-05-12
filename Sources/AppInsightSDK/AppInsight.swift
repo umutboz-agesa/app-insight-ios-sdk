@@ -230,6 +230,15 @@ public final class AppInsight {
         guard let action = insight.action else { return onInsightAction }
 
         switch action.type {
+        case "url":
+            return { msg in
+                guard let urlStr = msg.action?.url, let url = URL(string: urlStr) else {
+                    AppInsightLogger.error("url action: missing or invalid url — insight: \(msg.id)")
+                    return
+                }
+                AppInsightLogger.info("url action → opening: \(urlStr)")
+                DispatchQueue.main.async { UIApplication.shared.open(url) }
+            }
         case "redirect":
             return { [weak self] msg in
                 guard let self else { return }

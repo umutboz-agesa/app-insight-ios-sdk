@@ -97,7 +97,7 @@ struct InsightBannerSwiftUI: View {
 
             if let action = insight.action, action.type != "dismiss" {
                 Button(action: { onAction(); onDismiss() }) {
-                    Text(action.type == "deeplink" ? "Detayı Gör →" : "Aç →")
+                    Text(action.type == "deeplink" ? "Detayı Gör →" : action.type == "url" ? "Güncelle →" : "Aç →")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.accentColor)
                 }
@@ -205,7 +205,7 @@ struct InsightModalSwiftUI: View {
 
                 if let action = insight.action, action.type != "dismiss" {
                     Button(action: { onAction(); onDismiss() }) {
-                        Text(action.type == "deeplink" ? "Devam Et" : "Aç")
+                        Text(action.type == "deeplink" ? "Devam Et" : action.type == "url" ? "Güncelle" : "Aç")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)

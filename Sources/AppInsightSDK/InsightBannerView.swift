@@ -98,6 +98,7 @@ public final class InsightBannerView: UIView {
             case "deeplink":  label = "Detayı Gör"
             case "return_to": label = "İşleme Dön"
             case "set_value": label = (action.suggestedValue?.isEmpty == false) ? "Öneri Uygula" : "Değer Gir"
+            case "url":       label = "Güncelle"
             default:          label = "Aç"
             }
 
