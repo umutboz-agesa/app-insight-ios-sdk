@@ -118,6 +118,60 @@ AppInsight.shared.screenDidDisappear("CustomScreenName")
 
 **SwiftUI:**
 
+SwiftUI'da her ekran ayrı bir `UIViewController` değildir — hepsi tek bir
+`UIHostingController` içinde render edilir. Bu yüzden UIKit'teki
+"sınıf adından otomatik türet" yaklaşımının doğrudan karşılığı yoktur;
+ekran adı tip üzerinden verilir.
+
+---
+
+#### Option A — `InsightBaseView` (önerilen)
+
+`InsightBaseViewController`'ın SwiftUI karşılığı. Ekran başına yapılacak tek iş
+`View` yerine bu protokole conform etmek ve `body`'yi `screenBody` olarak
+adlandırmak. Tracking, ekran adı ve arka plan davranışı hazır gelir.
+
+```swift
+struct HomeView: InsightBaseView {
+    var screenBody: some View {
+        VStack { Text("Home") }
+    }
+}
+// → ekran adı "HomeView"
+```
+
+Adı özelleştirmek istersen (UIKit'teki `override var screenName` gibi):
+
+```swift
+struct HomeView: InsightBaseView {
+    var screenName: String { "Ana Sayfa" }
+    var screenBody: some View { ... }
+}
+```
+
+**Uygulama tarafında kendi base'ini tanımlamak** — UIKit projelerindeki
+`BaseViewController` kalıbının birebir karşılığı. Ara protokol tanımlarsan
+ekranların SDK'yı hiç bilmez, sadece kendi base'ine conform olur:
+
+```swift
+// Uygulamada bir kez:
+protocol BaseView: InsightBaseView {}
+
+// Her ekran:
+struct HomeView: BaseView {
+    var screenBody: some View { ... }
+}
+```
+
+Ortak davranış (tema, arka plan, safe area, ortak toolbar) eklemek istersen
+`BaseView` extension'ında `screenBody`'yi sarmalayabilirsin.
+
+---
+
+#### Option B — `.trackScreen(_:)` modifier
+
+Protokole geçmek istemediğin tek tük ekranlar için:
+
 ```swift
 struct HomeView: View {
     var body: some View {
@@ -126,6 +180,25 @@ struct HomeView: View {
     }
 }
 ```
+
+> `InsightBaseView` de arka planda bunu kullanır — davranış aynıdır.
+
+---
+
+**Ekran adı kuralı:** verdiğin ad, portaldeki funnel step'inin `screen` alanıyla
+birebir aynı olmalıdır.
+
+**Arka plan davranışı:** SwiftUI uygulama arka plana alınırken `onDisappear`
+çağırmaz. SDK bunu `scenePhase` üzerinden ele alır: arka plana geçişte
+`disappeared`, öne dönüşte `appeared` gönderilir. `.inactive` (bildirim merkezi,
+sistem alert'i) geçici kabul edilip yok sayılır.
+
+**Bilinen sınırlar:**
+
+- `TabView` — SwiftUI ekranda olmayan tab'ları önceden render edebilir; bu
+  durumda görünmeyen tab için `appeared` düşebilir.
+- `.sheet` / `.fullScreenCover` — altta kalan ekran `onDisappear` almaz, iki
+  ekran aynı anda aktif görünür. Dwell süreleri buna göre okunmalıdır.
 
 ### 3. Handle Insights
 
@@ -284,7 +357,20 @@ extension Notification.Name {
 
 | Member | Description |
 |---|---|
-| `var screenName: String` | Strips `ViewController` / `Controller` / `View` / `Screen` suffix |
+| `var screenName: String` | Raw class name — no suffix stripping (since v1.1.4) |
+
+### `InsightBaseView` (SwiftUI)
+
+| Member | Description |
+|---|---|
+| `var screenName: String` | Auto-derived from the struct type name — override to customize |
+| `var screenBody: some View` | Screen content — written instead of `body` |
+
+### `View` extension (SwiftUI)
+
+| Member | Description |
+|---|---|
+| `.trackScreen(_ name:)` | Tracks appear/disappear, incl. background transitions via `scenePhase` |
 
 ### `InsightMessage`
 
@@ -294,7 +380,7 @@ extension Notification.Name {
 | `title` | `String` | Insight title |
 | `body` | `String?` | Insight body text |
 | `data` | `[String: Any]` | Custom key-value payload |
-| `targetScreen` | `String?` | Screen the insight targets |
+| `targetScreens` | `[String]` | Screens the insight targets |
 | `display` | `InsightDisplay?` | Style (`banner`, `modal`, `toast`) and duration |
 | `action` | `InsightAction?` | Action type (`deeplink`, `url`, `dismiss`) and URL |
 

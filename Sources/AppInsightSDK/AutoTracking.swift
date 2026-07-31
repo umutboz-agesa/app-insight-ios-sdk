@@ -71,10 +71,44 @@ extension AppInsight {
 private struct ScreenTrackingModifier: ViewModifier {
     let name: String
 
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// View hierarchy'de mi (onAppear ile onDisappear arası).
+    @State private var isOnScreen = false
+    /// `appeared` gönderildi ve henüz `disappeared` gönderilmedi.
+    @State private var isReported = false
+
     func body(content: Content) -> some View {
         content
-            .onAppear    { AppInsight.shared.screenDidAppear(name) }
-            .onDisappear { AppInsight.shared.screenDidDisappear(name) }
+            .onAppear {
+                isOnScreen = true
+                report(appeared: true)
+            }
+            .onDisappear {
+                isOnScreen = false
+                report(appeared: false)
+            }
+            // SwiftUI arka plana alınırken onDisappear çağırmaz — ekran sonsuza dek
+            // "açık" kalır, dwell timer'ları da öyle. scenePhase ile kapatıyoruz.
+            .onChange(of: scenePhase) { phase in
+                guard isOnScreen else { return }
+                switch phase {
+                case .background: report(appeared: false)
+                case .active:     report(appeared: true)
+                default:          break   // .inactive geçici (bildirim merkezi, sistem alert'i)
+                }
+            }
+    }
+
+    /// Çift `appeared` / eşleşmeyen `disappeared` göndermemek için tek kapı.
+    private func report(appeared: Bool) {
+        guard appeared != isReported else { return }
+        isReported = appeared
+        if appeared {
+            AppInsight.shared.screenDidAppear(name)
+        } else {
+            AppInsight.shared.screenDidDisappear(name)
+        }
     }
 }
 
@@ -91,5 +125,48 @@ extension View {
     /// ```
     public func trackScreen(_ name: String) -> some View {
         modifier(ScreenTrackingModifier(name: name))
+    }
+}
+
+// MARK: - SwiftUI base view
+
+/// `InsightBaseViewController`'ın SwiftUI karşılığı.
+///
+/// SwiftUI'da inheritance yok; aynı etkiyi protocol + default `body` ile kuruyoruz.
+/// Ekran başına yapılacak tek iş: `View` yerine buna conform et, `body`'yi
+/// `screenBody` olarak adlandır. Tracking, ekran adı ve arka plan davranışı hazır gelir.
+///
+/// ```swift
+/// struct HomeView: InsightBaseView {
+///     var screenBody: some View {
+///         VStack { Text("Home") }
+///     }
+/// }
+/// // → ekran adı "HomeView"
+///
+/// // Adı özelleştirmek istersen (UIKit'teki `override var screenName` gibi):
+/// struct HomeView: InsightBaseView {
+///     var screenName: String { "Ana Sayfa" }
+///     var screenBody: some View { ... }
+/// }
+/// ```
+///
+/// > Ekran adı funnel step'indeki `screen` değeriyle birebir aynı olmalıdır.
+public protocol InsightBaseView: View {
+    associatedtype ScreenBody: View
+
+    /// Varsayılan: struct'ın tip adı. Override edilebilir.
+    var screenName: String { get }
+
+    /// Ekranın içeriği — normalde `body` yazacağın yer.
+    @ViewBuilder var screenBody: ScreenBody { get }
+}
+
+public extension InsightBaseView {
+
+    var screenName: String { String(describing: Self.self) }
+
+    var body: some View {
+        screenBody.trackScreen(screenName)
     }
 }

@@ -1,7 +1,31 @@
 import XCTest
+import SwiftUI
 @testable import AppInsightSDK
 
+// MARK: - InsightBaseView fixtures
+
+/// Uygulama tarafındaki ara protokol — `BaseViewController` analojisi.
+/// Ekranlar `InsightBaseView`'a değil, bu protokole conform olur.
+private protocol AppBaseView: InsightBaseView {}
+
+private struct HomeView: AppBaseView {
+    var screenBody: some View { Text("Home") }
+}
+
+private struct ProfileView: AppBaseView {
+    var screenName: String { "Profilim" }
+    var screenBody: some View { Text("Profile") }
+}
+
 final class AppInsightSDKTests: XCTestCase {
+
+    func testBaseViewDerivesScreenNameThroughIntermediateProtocol() {
+        XCTAssertEqual(HomeView().screenName, "HomeView")
+    }
+
+    func testBaseViewScreenNameOverrideWins() {
+        XCTAssertEqual(ProfileView().screenName, "Profilim")
+    }
 
     func testScreenTrackerAppearedDisappeared() {
         let tracker = ScreenTracker()
@@ -69,7 +93,7 @@ final class AppInsightSDKTests: XCTestCase {
             XCTAssertEqual(insight.id, "ins-1")
             XCTAssertEqual(insight.title, "Fırsat!")
             XCTAssertEqual(insight.body, "Hemen al")
-            XCTAssertEqual(insight.targetScreen, "checkout")
+            XCTAssertEqual(insight.targetScreens, ["checkout"])
             XCTAssertEqual(insight.data["code"] as? String, "SAVE10")
             XCTAssertEqual(insight.display?.style, "banner")
             XCTAssertEqual(insight.action?.url, "app://promo")
@@ -104,7 +128,8 @@ final class AppInsightSDKTests: XCTestCase {
         let json = try? JSONSerialization.jsonObject(with: data!) as? [String: Any]
         XCTAssertEqual(json?["type"] as? String, "sdk_init")
         XCTAssertEqual(json?["api_key"] as? String, "ak_test")
-        XCTAssertEqual(json?["platform"] as? String, "ios")
+        // platform artık üst seviyede değil, "device" altında yuvalanıyor
+        XCTAssertEqual((json?["device"] as? [String: Any])?["platform"] as? String, "ios")
     }
 
     func testScreenNameDerivation() {
